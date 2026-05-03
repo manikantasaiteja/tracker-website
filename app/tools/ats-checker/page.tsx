@@ -74,7 +74,7 @@ export default function ATSCheckerPage() {
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,
         useWorkerFetch: false,
-        isEvalSupported: false,
+        // isEvalSupported: false,
       }).promise;
       
       let fullText = "";
