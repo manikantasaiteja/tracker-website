@@ -28,6 +28,8 @@ export default function ATSCheckerPage() {
   const [extracting, setExtracting] = useState(false);
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [cvText, setCvText] = useState("");
+  const [manualCvText, setManualCvText] = useState("");
+  const [inputMode, setInputMode] = useState<"pdf" | "text">("pdf");
   const [jobDescription, setJobDescription] = useState("");
   const [result, setResult] = useState<ATSResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,25 +67,42 @@ export default function ATSCheckerPage() {
       // Dynamically import pdfjs-dist only on client side
       const pdfjsLib = await import("pdfjs-dist");
       
-      // Configure worker
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      // Configure worker - use unpkg as a reliable CDN that auto-resolves versions
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
       
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+      }).promise;
+      
       let fullText = "";
 
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         const pageText = textContent.items
-          .map((item: any) => item.str)
+          .map((item: any) => {
+            // Handle both string items and objects with 'str' property
+            if (typeof item === 'string') return item;
+            return item.str || '';
+          })
           .join(" ");
         fullText += pageText + "\n";
       }
 
-      return fullText;
+      if (!fullText.trim()) {
+        throw new Error("No text could be extracted from the PDF. The PDF might be image-based or empty.");
+      }
+
+      return fullText.trim();
     } catch (err) {
-      throw new Error("Failed to extract text from PDF. Please ensure it's a valid PDF file.");
+      console.error("PDF extraction error:", err);
+      if (err instanceof Error && err.message.includes("No text could be extracted")) {
+        throw err;
+      }
+      throw new Error("Failed to extract text from PDF. Please ensure it's a valid PDF file or try pasting the text directly.");
     }
   }
 
@@ -264,8 +283,11 @@ export default function ATSCheckerPage() {
     setError(null);
     setResult(null);
 
-    if (!cvText.trim() || !jobDescription.trim()) {
-      setError("Please upload your CV and provide the job description.");
+    // Get CV text from either PDF extraction or manual input
+    const finalCvText = inputMode === "pdf" ? cvText : manualCvText;
+
+    if (!finalCvText.trim() || !jobDescription.trim()) {
+      setError("Please provide your CV text (upload PDF or paste text) and the job description.");
       return;
     }
 
@@ -276,11 +298,11 @@ export default function ATSCheckerPage() {
       const relevantJobText = extractJobRequirements(jobDescription);
       
       const jobKeywords = extractKeywords(relevantJobText);
-      const cvKeywords = extractKeywords(cvText);
+      const cvKeywords = extractKeywords(finalCvText);
 
       // Create a more flexible matching system (partial matches)
       const cvKeywordsSet = new Set(cvKeywords);
-      const cvTextLower = cvText.toLowerCase();
+      const cvTextLower = finalCvText.toLowerCase();
       
       const matchedKeywords = jobKeywords.filter((keyword) => {
         // Exact match
@@ -341,7 +363,7 @@ export default function ATSCheckerPage() {
         "🔤 Include both full terms and acronyms (e.g., 'Artificial Intelligence (AI)', 'Search Engine Optimization (SEO)')."
       );
 
-      if (cvText.length < 500) {
+      if (finalCvText.length < 500) {
         suggestions.push(
           "📄 Your CV seems short. Consider adding more details about your experience, achievements, and projects."
         );
@@ -422,56 +444,106 @@ export default function ATSCheckerPage() {
 
             <form className="ats-form" onSubmit={analyzeATS}>
               <div className="ats-input-group">
-                <label className="ats-label">
-                  <span className="label-text">
-                    <strong className="required-field">Upload Your CV (PDF)</strong>
-                    <span className="label-hint">Upload your CV in PDF format for automatic text extraction</span>
-                  </span>
-                  <div className="file-upload-zone">
+                <div className="input-mode-selector">
+                  <label className="mode-option">
                     <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={handleCVUpload}
-                      className="file-input-hidden"
-                      id="cv-upload"
-                      required={!cvText}
+                      type="radio"
+                      name="inputMode"
+                      value="pdf"
+                      checked={inputMode === "pdf"}
+                      onChange={() => {
+                        setInputMode("pdf");
+                        setManualCvText("");
+                        setError(null);
+                      }}
                     />
-                    <label htmlFor="cv-upload" className="file-upload-label">
-                      {extracting ? (
-                        <>
-                          <span className="upload-icon">⏳</span>
-                          <span className="upload-text">Extracting text from PDF...</span>
-                        </>
-                      ) : cvFile ? (
-                        <>
-                          <span className="upload-icon">✅</span>
-                          <span className="upload-text">
-                            <strong>{cvFile.name}</strong>
-                            <span className="file-size">
-                              {(cvFile.size / 1024).toFixed(1)} KB • {cvText.length} characters extracted
+                    <span>📄 Upload PDF</span>
+                  </label>
+                  <label className="mode-option">
+                    <input
+                      type="radio"
+                      name="inputMode"
+                      value="text"
+                      checked={inputMode === "text"}
+                      onChange={() => {
+                        setInputMode("text");
+                        setCvFile(null);
+                        setCvText("");
+                        setError(null);
+                      }}
+                    />
+                    <span>✍️ Paste Text</span>
+                  </label>
+                </div>
+
+                {inputMode === "pdf" ? (
+                  <label className="ats-label">
+                    <span className="label-text">
+                      <strong className="required-field">Upload Your CV (PDF)</strong>
+                      <span className="label-hint">Upload your CV in PDF format for automatic text extraction</span>
+                    </span>
+                    <div className="file-upload-zone">
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={handleCVUpload}
+                        className="file-input-hidden"
+                        id="cv-upload"
+                        required={inputMode === "pdf" && !cvText}
+                      />
+                      <label htmlFor="cv-upload" className="file-upload-label">
+                        {extracting ? (
+                          <>
+                            <span className="upload-icon">⏳</span>
+                            <span className="upload-text">Extracting text from PDF...</span>
+                          </>
+                        ) : cvFile ? (
+                          <>
+                            <span className="upload-icon">✅</span>
+                            <span className="upload-text">
+                              <strong>{cvFile.name}</strong>
+                              <span className="file-size">
+                                {(cvFile.size / 1024).toFixed(1)} KB • {cvText.length} characters extracted
+                              </span>
                             </span>
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="upload-icon">📄</span>
-                          <span className="upload-text">
-                            <strong>Click to upload CV</strong>
-                            <span className="file-hint">PDF format only • Max 10MB</span>
-                          </span>
-                        </>
-                      )}
-                    </label>
-                  </div>
-                  {cvText && (
-                    <details className="cv-preview">
-                      <summary>👁️ Preview extracted text ({cvText.length} characters)</summary>
-                      <div className="preview-content">
-                        {cvText.substring(0, 500)}...
-                      </div>
-                    </details>
-                  )}
-                </label>
+                          </>
+                        ) : (
+                          <>
+                            <span className="upload-icon">📄</span>
+                            <span className="upload-text">
+                              <strong>Click to upload CV</strong>
+                              <span className="file-hint">PDF format only • Max 10MB</span>
+                            </span>
+                          </>
+                        )}
+                      </label>
+                    </div>
+                    {cvText && (
+                      <details className="cv-preview">
+                        <summary>👁️ Preview extracted text ({cvText.length} characters)</summary>
+                        <div className="preview-content">
+                          {cvText.substring(0, 500)}...
+                        </div>
+                      </details>
+                    )}
+                  </label>
+                ) : (
+                  <label className="ats-label">
+                    <span className="label-text">
+                      <strong className="required-field">Your CV Text</strong>
+                      <span className="label-hint">Paste your CV content directly as text</span>
+                    </span>
+                    <textarea
+                      className="ats-textarea"
+                      onChange={(event) => setManualCvText(event.target.value)}
+                      placeholder="Paste your CV text here... Include your experience, skills, education, and achievements."
+                      required={inputMode === "text"}
+                      rows={12}
+                      value={manualCvText}
+                    />
+                    <span className="char-count">{manualCvText.length} characters</span>
+                  </label>
+                )}
 
                 <label className="ats-label">
                   <span className="label-text">
@@ -496,7 +568,7 @@ export default function ATSCheckerPage() {
 
               <button
                 className="primary-button analyze-button"
-                disabled={analyzing || extracting || !cvText}
+                disabled={analyzing || extracting || (inputMode === "pdf" ? !cvText : !manualCvText)}
                 type="submit"
               >
                 {analyzing ? "🔄 Analyzing..." : "🔍 Analyze ATS Score"}
