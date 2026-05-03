@@ -67,24 +67,17 @@ export default function CoverLetterPage() {
 
   async function extractTextFromPDF(file: File): Promise<string> {
     try {
-      console.log("Starting PDF extraction for:", file.name);
+      // Dynamically import pdfjs-dist only on client side
+      const pdfjsLib = await import("pdfjs-dist");
       
-      // Dynamic import of pdfjs-dist
-      const pdfjs = await import("pdfjs-dist");
-      
-      // Set worker to use CDN with https protocol
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-      
-      console.log("PDF.js version:", pdfjs.version);
-      console.log("Worker source:", pdfjs.GlobalWorkerOptions.workerSrc);
+      // Configure worker - use unpkg as a reliable CDN that auto-resolves versions
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
       
       const arrayBuffer = await file.arrayBuffer();
-      console.log("File read, size:", arrayBuffer.byteLength);
-      
-      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
-      
-      console.log("PDF loaded, pages:", pdf.numPages);
+      const pdf = await pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        useWorkerFetch: false,
+      }).promise;
       
       let fullText = "";
 
@@ -92,16 +85,26 @@ export default function CoverLetterPage() {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         const pageText = textContent.items
-          .map((item: any) => item.str)
+          .map((item: any) => {
+            // Handle both string items and objects with 'str' property
+            if (typeof item === 'string') return item;
+            return item.str || '';
+          })
           .join(" ");
         fullText += pageText + "\n";
       }
 
-      console.log("Extraction complete, text length:", fullText.length);
+      if (!fullText.trim()) {
+        throw new Error("No text could be extracted from the PDF. The PDF might be image-based or empty.");
+      }
+
       return fullText.trim();
     } catch (err) {
-      console.error("PDF extraction error details:", err);
-      throw new Error(`Failed to extract text from PDF: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error("PDF extraction error:", err);
+      if (err instanceof Error && err.message.includes("No text could be extracted")) {
+        throw err;
+      }
+      throw new Error("Failed to extract text from PDF. Please ensure it's a valid PDF file.");
     }
   }
 
