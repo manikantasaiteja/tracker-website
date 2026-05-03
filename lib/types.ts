@@ -18,7 +18,10 @@ export type ApplicationRecord = {
   date_applied: string;
   location: string | null;
   job_url: string | null;
-  notes: string | null;
+  cv_file_name: string | null;
+  cv_file_url: string | null;
+  cover_letter_file_name: string | null;
+  cover_letter_file_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -30,5 +33,6 @@ export type ApplicationDraft = {
   date_applied: string;
   location: string;
   job_url: string;
-  notes: string;
+  cvFile: File | null;
+  coverLetterFile: File | null;
 };

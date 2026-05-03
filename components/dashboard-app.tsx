@@ -26,7 +26,8 @@ const EMPTY_DRAFT: ApplicationDraft = {
   date_applied: new Date().toISOString().split("T")[0] ?? "",
   location: "",
   job_url: "",
-  notes: "",
+  cvFile: null,
+  coverLetterFile: null,
 };
 
 type DashboardAppProps = {
@@ -59,6 +60,17 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
 
     return "dark";
   });
+
+  // Auto-dismiss notice after 5 seconds
+  useEffect(() => {
+    if (notice) {
+      const timer = setTimeout(() => {
+        setNotice(null);
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [notice]);
   const [draft, setDraft] = useState<ApplicationDraft>(EMPTY_DRAFT);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -114,6 +126,45 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
         return;
       }
 
+      // Check if user is approved
+      const { data: profile, error: profileError } = await client
+        .from("user_profiles")
+        .select("is_approved, email")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+      }
+
+      // If profile doesn't exist, create it
+      if (!profile) {
+        console.log("Profile not found, creating one...");
+        const { error: insertError } = await client
+          .from("user_profiles")
+          .insert({
+            id: session.user.id,
+            full_name: session.user.user_metadata?.full_name || "",
+            email: session.user.email || "",
+            phone_number: session.user.user_metadata?.phone_number || "",
+            is_approved: false,
+          });
+
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+        }
+        
+        // Profile just created, so not approved yet
+        router.replace("/pending-approval");
+        return;
+      }
+
+      // If not approved, redirect to pending approval page
+      if (!profile?.is_approved) {
+        router.replace("/pending-approval");
+        return;
+      }
+
       const nextLabel =
         session.user.user_metadata.full_name ||
         session.user.email ||
@@ -155,7 +206,8 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
       date_applied: item.date_applied,
       location: item.location ?? "",
       job_url: item.job_url ?? "",
-      notes: item.notes ?? "",
+      cvFile: null,
+      coverLetterFile: null,
     });
     setShowModal(true);
   }
@@ -181,21 +233,63 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
       return;
     }
 
-    const payload = {
-      user_id: session.user.id,
-      company: draft.company.trim(),
-      role: draft.role.trim(),
-      status: draft.status,
-      date_applied: draft.date_applied,
-      location: draft.location.trim() || null,
-      job_url: draft.job_url.trim() || null,
-      notes: draft.notes.trim() || null,
-    };
-
     try {
-      if (!payload.company || !payload.role || !payload.date_applied) {
+      if (!draft.company.trim() || !draft.role.trim() || !draft.date_applied) {
         throw new Error("Company, role, and applied date are required.");
       }
+
+      let cvFileName = null;
+      let cvFileUrl = null;
+      let coverLetterFileName = null;
+      let coverLetterFileUrl = null;
+
+      // Upload CV if provided
+      if (draft.cvFile) {
+        const cvPath = `${session.user.id}/${Date.now()}_${draft.cvFile.name}`;
+        const { error: cvUploadError } = await client.storage
+          .from("application-documents")
+          .upload(cvPath, draft.cvFile);
+
+        if (cvUploadError) {
+          throw new Error(`CV upload failed: ${cvUploadError.message}`);
+        }
+
+        const { data: cvUrlData } = client.storage
+          .from("application-documents")
+          .getPublicUrl(cvPath);
+
+        cvFileName = draft.cvFile.name;
+        cvFileUrl = cvPath; // Store path for authenticated download
+      }
+
+      // Upload Cover Letter if provided
+      if (draft.coverLetterFile) {
+        const clPath = `${session.user.id}/${Date.now()}_${draft.coverLetterFile.name}`;
+        const { error: clUploadError } = await client.storage
+          .from("application-documents")
+          .upload(clPath, draft.coverLetterFile);
+
+        if (clUploadError) {
+          throw new Error(`Cover letter upload failed: ${clUploadError.message}`);
+        }
+
+        coverLetterFileName = draft.coverLetterFile.name;
+        coverLetterFileUrl = clPath; // Store path for authenticated download
+      }
+
+      const payload = {
+        user_id: session.user.id,
+        company: draft.company.trim(),
+        role: draft.role.trim(),
+        status: draft.status,
+        date_applied: draft.date_applied,
+        location: draft.location.trim() || null,
+        job_url: draft.job_url.trim() || null,
+        ...(cvFileName && { cv_file_name: cvFileName }),
+        ...(cvFileUrl && { cv_file_url: cvFileUrl }),
+        ...(coverLetterFileName && { cover_letter_file_name: coverLetterFileName }),
+        ...(coverLetterFileUrl && { cover_letter_file_url: coverLetterFileUrl }),
+      };
 
       if (editingId) {
         const { error: updateError } = await client
@@ -274,6 +368,94 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
     await loadApplications(session.user.id);
   }
 
+  async function downloadFile(filePath: string, fileName: string) {
+    if (!supabase) {
+      setError("Supabase client is still loading.");
+      return;
+    }
+
+    try {
+      const { data, error: downloadError } = await supabase.storage
+        .from("application-documents")
+        .download(filePath);
+
+      if (downloadError) {
+        throw downloadError;
+      }
+
+      // Create a download link
+      const url = URL.createObjectURL(data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Failed to download file.",
+      );
+    }
+  }
+
+  async function updateApplicationStatus(id: string, currentStatus: ApplicationStatus) {
+    if (!supabase) {
+      setError("Supabase client is still loading.");
+      return;
+    }
+
+    // Define the status progression order
+    const statusOrder: ApplicationStatus[] = [
+      "Applied",
+      "Interview",
+      "Offer",
+      "Rejected",
+      "Ghosted",
+      "Withdrawn",
+    ];
+
+    // Get the next status in the cycle
+    const currentIndex = statusOrder.indexOf(currentStatus);
+    const nextIndex = (currentIndex + 1) % statusOrder.length;
+    const nextStatus = statusOrder[nextIndex];
+
+    setError(null);
+    setNotice(null);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      router.replace("/login");
+      return;
+    }
+
+    try {
+      const { error: updateError } = await supabase
+        .from("applications")
+        .update({ status: nextStatus })
+        .eq("id", id)
+        .eq("user_id", session.user.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setNotice(`Status updated to ${nextStatus}`);
+      await loadApplications(session.user.id);
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Failed to update status.",
+      );
+    }
+  }
+
   async function signOut() {
     if (!supabase) {
       return;
@@ -342,15 +524,25 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
           </div>
         </Link>
 
+        <nav className="dashboard-tabs">
+          <Link href="/dashboard" className="tab-link active">
+            📊 Applications
+          </Link>
+          <Link href="/tools" className="tab-link">
+            🛠️ Tools
+          </Link>
+          <Link href="/profile" className="tab-link">
+            👤 Profile
+          </Link>
+          <Link href="/about" className="tab-link">
+            ℹ️ About
+          </Link>
+        </nav>
+
         <div className="dashboard-header__actions">
-          <div className="dashboard-pill">
-            <span className="dashboard-pill__dot" />
-            Supabase connected
-          </div>
           <button className="secondary-button" onClick={handleThemeToggle} type="button">
-            {theme === "dark" ? "Light mode" : "Dark mode"}
+            {theme === "dark" ? "☀️" : "🌙"}
           </button>
-          <div className="dashboard-user">{userLabel}</div>
           <button className="secondary-button" onClick={signOut} type="button">
             Sign out
           </button>
@@ -438,7 +630,8 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
                   <th>Applied</th>
                   <th>Status</th>
                   <th>Location</th>
-                  <th>Notes</th>
+                  <th>CV</th>
+                  <th>Cover Letter</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -459,12 +652,56 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
                       </td>
                       <td>{item.date_applied}</td>
                       <td>
-                        <span className={`status-badge status-badge--${item.status}`}>
+                        <button
+                          className={`status-badge status-badge--${item.status} status-badge--clickable`}
+                          onClick={() => updateApplicationStatus(item.id, item.status)}
+                          type="button"
+                          title="Click to advance to next status"
+                        >
                           {item.status}
-                        </span>
+                        </button>
                       </td>
                       <td>{item.location ?? "Remote / n/a"}</td>
-                      <td className="notes-cell">{item.notes ?? "No notes yet"}</td>
+                      <td>
+                        {item.cv_file_url && item.cv_file_name ? (
+                          <button
+                            className="document-download-btn"
+                            onClick={() => downloadFile(item.cv_file_url!, item.cv_file_name!)}
+                            type="button"
+                            title="Download CV"
+                          >
+                            📄 {item.cv_file_name}
+                          </button>
+                        ) : (
+                          <button
+                            className="document-add-btn"
+                            onClick={() => openEditModal(item)}
+                            type="button"
+                          >
+                            + Add CV
+                          </button>
+                        )}
+                      </td>
+                      <td>
+                        {item.cover_letter_file_url && item.cover_letter_file_name ? (
+                          <button
+                            className="document-download-btn"
+                            onClick={() => downloadFile(item.cover_letter_file_url!, item.cover_letter_file_name!)}
+                            type="button"
+                            title="Download Cover Letter"
+                          >
+                            📝 {item.cover_letter_file_name}
+                          </button>
+                        ) : (
+                          <button
+                            className="document-add-btn"
+                            onClick={() => openEditModal(item)}
+                            type="button"
+                          >
+                            + Add CL
+                          </button>
+                        )}
+                      </td>
                       <td>
                         <div className="row-actions">
                           <button
@@ -487,7 +724,7 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
                   ))
                 ) : (
                   <tr>
-                    <td className="empty-state" colSpan={7}>
+                    <td className="empty-state" colSpan={8}>
                       {applications.length
                         ? "No applications match the current filter."
                         : "No applications yet. Add your first one to create live Supabase data."}
@@ -531,7 +768,7 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
 
             <form className="modal-form" onSubmit={saveApplication}>
               <label>
-                <span>Company</span>
+                <span className="required-field">Company</span>
                 <input
                   onChange={(event) => updateDraft("company", event.target.value)}
                   required
@@ -540,7 +777,7 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
               </label>
 
               <label>
-                <span>Role</span>
+                <span className="required-field">Role</span>
                 <input
                   onChange={(event) => updateDraft("role", event.target.value)}
                   required
@@ -549,7 +786,7 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
               </label>
 
               <label>
-                <span>Date applied</span>
+                <span className="required-field">Date applied</span>
                 <input
                   onChange={(event) => updateDraft("date_applied", event.target.value)}
                   required
@@ -593,14 +830,40 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
                 />
               </label>
 
-              <label className="modal-form__full">
-                <span>Notes</span>
-                <textarea
-                  onChange={(event) => updateDraft("notes", event.target.value)}
-                  placeholder="Interview prep, recruiter notes, follow-up details..."
-                  rows={5}
-                  value={draft.notes}
+              <label className="modal-form__full file-upload-section">
+                <span>📄 Upload CV (PDF, DOC, DOCX)</span>
+                <input
+                  accept=".pdf,.doc,.docx"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    updateDraft("cvFile", file);
+                  }}
+                  type="file"
+                  className="file-input"
                 />
+                {draft.cvFile ? (
+                  <span className="file-name">✓ Selected: {draft.cvFile.name}</span>
+                ) : (
+                  <span className="file-hint">No file selected</span>
+                )}
+              </label>
+
+              <label className="modal-form__full file-upload-section">
+                <span>📝 Upload Cover Letter (PDF, DOC, DOCX)</span>
+                <input
+                  accept=".pdf,.doc,.docx"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    updateDraft("coverLetterFile", file);
+                  }}
+                  type="file"
+                  className="file-input"
+                />
+                {draft.coverLetterFile ? (
+                  <span className="file-name">✓ Selected: {draft.coverLetterFile.name}</span>
+                ) : (
+                  <span className="file-hint">No file selected</span>
+                )}
               </label>
 
               <div className="modal-card__footer">
