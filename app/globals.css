@@ -7641,3 +7641,147 @@ tbody tr:hover {
     border-bottom: 1px solid #e5e7eb;
   }
 }
+
+/* Resume Section Styles */
+.resume-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.resume-uploaded {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  gap: 1rem;
+}
+
+.resume-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.resume-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.resume-filename {
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 0.25rem 0;
+  word-break: break-word;
+}
+
+.resume-meta {
+  font-size: 0.875rem;
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.resume-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.resume-empty {
+  padding: 2rem;
+  text-align: center;
+  background: var(--surface-soft);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+.resume-empty-text {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.resume-upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.resume-upload-label {
+  display: inline-block;
+  cursor: pointer;
+}
+
+.resume-upload-input {
+  display: none;
+}
+
+.resume-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.875rem 1.75rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.resume-upload-button:hover {
+  background: var(--accent-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px var(--accent-glow);
+}
+
+.resume-upload-label:has(input:disabled) .resume-upload-button {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.resume-upload-hint {
+  font-size: 0.8125rem;
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.danger-button-small {
+  padding: 0.625rem 1.25rem;
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.danger-button-small:hover {
+  background: var(--danger);
+  color: white;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+  .resume-uploaded {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .resume-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .resume-actions button {
+    width: 100%;
+  }
+}

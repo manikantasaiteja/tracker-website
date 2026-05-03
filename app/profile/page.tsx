@@ -13,6 +13,8 @@ type UserProfile = {
   lastName: string;
   email: string;
   phoneNumber: string;
+  resumeFileName: string | null;
+  resumeFileUrl: string | null;
 };
 
 type PasswordForm = {
@@ -35,6 +37,8 @@ export default function ProfilePage() {
     lastName: "",
     email: "",
     phoneNumber: "",
+    resumeFileName: null,
+    resumeFileUrl: null,
   });
   const [passwordForm, setPasswordForm] = useState<PasswordForm>({
     currentPassword: "",
@@ -51,6 +55,9 @@ export default function ProfilePage() {
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [resumeMessage, setResumeMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -86,6 +93,8 @@ export default function ProfilePage() {
           lastName,
           email: session.user.email || "",
           phoneNumber: profileData?.phone_number || "",
+          resumeFileName: profileData?.resume_file_name || null,
+          resumeFileUrl: profileData?.resume_file_url || null,
         });
       } catch (err) {
         console.error("Error loading profile:", err);
@@ -229,6 +238,163 @@ export default function ProfilePage() {
     if (!supabase) return;
     await supabase.auth.signOut();
     router.replace("/login");
+  }
+
+  async function handleResumeUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !supabase) return;
+
+    // Validate file type
+    const allowedTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      setResumeError("Invalid file type. Only PDF, DOC, and DOCX are allowed.");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setResumeError("File size exceeds 5MB limit.");
+      return;
+    }
+
+    setUploadingResume(true);
+    setResumeError(null);
+    setResumeMessage(null);
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error("No active session");
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/resume/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to upload resume");
+      }
+
+      setProfile((current) => ({
+        ...current,
+        resumeFileName: data.fileName,
+        resumeFileUrl: data.fileUrl,
+      }));
+
+      setResumeMessage("Resume uploaded successfully!");
+    } catch (err) {
+      setResumeError(
+        err instanceof Error ? err.message : "Failed to upload resume"
+      );
+    } finally {
+      setUploadingResume(false);
+      // Reset file input
+      event.target.value = "";
+    }
+  }
+
+  async function handleResumeDownload() {
+    if (!supabase || !profile.resumeFileUrl) return;
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error("No active session");
+      }
+
+      const response = await fetch("/api/resume/download", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to download resume");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = profile.resumeFileName || "resume.pdf";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      setResumeError(
+        err instanceof Error ? err.message : "Failed to download resume"
+      );
+    }
+  }
+
+  async function handleResumeDelete() {
+    if (!supabase || !profile.resumeFileUrl) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete your resume? This action cannot be undone."
+    );
+
+    if (!confirmed) return;
+
+    setResumeError(null);
+    setResumeMessage(null);
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error("No active session");
+      }
+
+      const response = await fetch("/api/resume/delete", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete resume");
+      }
+
+      setProfile((current) => ({
+        ...current,
+        resumeFileName: null,
+        resumeFileUrl: null,
+      }));
+
+      setResumeMessage("Resume deleted successfully!");
+    } catch (err) {
+      setResumeError(
+        err instanceof Error ? err.message : "Failed to delete resume"
+      );
+    }
   }
 
   if (loading || !supabase) {
@@ -414,6 +580,77 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
+          </section>
+
+          {/* Resume Management */}
+          <section className="profile-section-card">
+            <div className="section-header">
+              <div className="section-header-left">
+                <span className="section-icon">📄</span>
+                <h2 className="section-title-main">Resume</h2>
+              </div>
+            </div>
+
+            <div className="resume-section">
+              {profile.resumeFileName ? (
+                <div className="resume-uploaded">
+                  <div className="resume-info">
+                    <span className="resume-icon">📄</span>
+                    <div>
+                      <p className="resume-filename">{profile.resumeFileName}</p>
+                      <p className="resume-meta">Uploaded resume</p>
+                    </div>
+                  </div>
+                  <div className="resume-actions">
+                    <button
+                      className="secondary-button"
+                      onClick={handleResumeDownload}
+                      type="button"
+                    >
+                      ⬇️ Download
+                    </button>
+                    <button
+                      className="danger-button-small"
+                      onClick={handleResumeDelete}
+                      type="button"
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="resume-empty">
+                  <p className="resume-empty-text">
+                    No resume uploaded yet. Upload your resume to keep it handy for job applications.
+                  </p>
+                </div>
+              )}
+
+              <div className="resume-upload-section">
+                <label className="resume-upload-label">
+                  <input
+                    accept=".pdf,.doc,.docx"
+                    className="resume-upload-input"
+                    disabled={uploadingResume}
+                    onChange={handleResumeUpload}
+                    type="file"
+                  />
+                  <span className="resume-upload-button">
+                    {uploadingResume ? "Uploading..." : profile.resumeFileName ? "Replace Resume" : "Upload Resume"}
+                  </span>
+                </label>
+                <p className="resume-upload-hint">
+                  Supported formats: PDF, DOC, DOCX (Max 5MB)
+                </p>
+              </div>
+
+              {resumeError ? (
+                <div className="auth-banner auth-banner--error">{resumeError}</div>
+              ) : null}
+              {resumeMessage ? (
+                <div className="auth-banner auth-banner--success">{resumeMessage}</div>
+              ) : null}
+            </div>
           </section>
 
           {/* Change Password */}
