@@ -126,6 +126,45 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
         return;
       }
 
+      // Check if user is approved
+      const { data: profile, error: profileError } = await client
+        .from("user_profiles")
+        .select("is_approved, email")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+      }
+
+      // If profile doesn't exist, create it
+      if (!profile) {
+        console.log("Profile not found, creating one...");
+        const { error: insertError } = await client
+          .from("user_profiles")
+          .insert({
+            id: session.user.id,
+            full_name: session.user.user_metadata?.full_name || "",
+            email: session.user.email || "",
+            phone_number: session.user.user_metadata?.phone_number || "",
+            is_approved: false,
+          });
+
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+        }
+        
+        // Profile just created, so not approved yet
+        router.replace("/pending-approval");
+        return;
+      }
+
+      // If not approved, redirect to pending approval page
+      if (!profile?.is_approved) {
+        router.replace("/pending-approval");
+        return;
+      }
+
       const nextLabel =
         session.user.user_metadata.full_name ||
         session.user.email ||

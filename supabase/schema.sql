@@ -1,11 +1,29 @@
 create extension if not exists "pgcrypto";
 
--- Store user profile data including phone number
+-- Store admin users
+create table if not exists public.admins (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null unique,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.admins enable row level security;
+
+create policy "Admins can read admin table"
+on public.admins
+for select
+using (auth.uid() = id);
+
+-- Store user profile data including phone number and approval status
 create table if not exists public.user_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text,
+  email text,
   phone_number text,
   country_code text,
+  is_approved boolean not null default false,
+  approved_at timestamptz,
+  approved_by uuid references public.admins(id),
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
@@ -26,6 +44,65 @@ create policy "Users can update their own profile"
 on public.user_profiles
 for update
 using (auth.uid() = id);
+
+create policy "Admins can read all profiles"
+on public.user_profiles
+for select
+using (exists (select 1 from public.admins where id = auth.uid()));
+
+create policy "Admins can update all profiles"
+on public.user_profiles
+for update
+using (exists (select 1 from public.admins where id = auth.uid()));
+
+-- ============================================
+-- Trigger to auto-create user profiles
+-- ============================================
+
+-- Function to automatically create user profile when user signs up
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Insert a new profile for the user
+  INSERT INTO public.user_profiles (
+    id,
+    full_name,
+    email,
+    phone_number,
+    is_approved,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'phone_number', ''),
+    false,
+    NOW(),
+    NOW()
+  );
+  
+  RETURN NEW;
+EXCEPTION
+  WHEN unique_violation THEN
+    -- Profile already exists, ignore
+    RETURN NEW;
+END;
+$$;
+
+-- Drop the trigger if it already exists
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- Create the trigger
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
 
 create table if not exists public.applications (
   id uuid primary key default gen_random_uuid(),

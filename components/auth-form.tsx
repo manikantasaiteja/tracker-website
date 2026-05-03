@@ -102,13 +102,54 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     try {
       if (isLogin) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email: form.email,
           password: form.password,
         });
 
         if (signInError) {
           throw signInError;
+        }
+
+        // Check if user is approved
+        const { data: profile, error: profileError } = await supabase
+          .from("user_profiles")
+          .select("is_approved, email")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error("Error fetching profile:", profileError);
+        }
+
+        // If profile doesn't exist, create it
+        if (!profile) {
+          console.log("Profile not found, creating one...");
+          const { error: insertError } = await supabase
+            .from("user_profiles")
+            .insert({
+              id: data.user.id,
+              full_name: data.user.user_metadata?.full_name || "",
+              email: data.user.email || "",
+              phone_number: data.user.user_metadata?.phone_number || "",
+              is_approved: false,
+            });
+
+          if (insertError) {
+            console.error("Error creating profile:", insertError);
+          }
+          
+          // Profile just created, so not approved yet
+          router.replace("/pending-approval");
+          router.refresh();
+          return;
+        }
+
+        // If not approved, redirect to pending approval page
+        if (!profile?.is_approved) {
+          router.replace("/pending-approval");
+          router.refresh();
+          return;
         }
 
         router.replace("/dashboard");
@@ -138,24 +179,38 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       // Store additional profile data in user_profiles table
       if (signUpData.user) {
-        const { error: profileError } = await supabase
+        console.log("Creating user profile for:", signUpData.user.id);
+        
+        const { data: insertedProfile, error: profileError } = await supabase
           .from("user_profiles")
           .insert({
             id: signUpData.user.id,
             full_name: form.fullName,
             phone_number: form.phoneNumber,
-          });
+            email: form.email,
+            is_approved: false,
+          })
+          .select()
+          .single();
 
         if (profileError) {
           console.error("Error creating user profile:", profileError);
+          // If profile creation fails, show error but don't block registration
+          setError(`Account created but profile setup incomplete: ${profileError.message}`);
+        } else {
+          console.log("Profile created successfully:", insertedProfile);
         }
       }
 
       setMessage(
-        "Account created. If your project requires email confirmation, verify your inbox before signing in.",
+        "Account created successfully! Redirecting to approval status page...",
       );
       setForm((current) => ({ ...current, password: "", confirmPassword: "" }));
-      router.push("/login");
+      
+      // Redirect to pending approval page
+      setTimeout(() => {
+        router.push("/pending-approval");
+      }, 1500);
     } catch (caughtError) {
       const nextError =
         caughtError instanceof Error
