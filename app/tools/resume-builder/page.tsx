@@ -70,24 +70,43 @@ export default function ResumeBuilderPage() {
 
   async function extractTextFromPDF(file: File): Promise<string> {
     try {
+      // Dynamically import pdfjs-dist only on client side
       const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      
+      // Configure worker - use unpkg as a reliable CDN that auto-resolves versions
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
       
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        useWorkerFetch: false,
+      }).promise;
+      
       let fullText = "";
 
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         const pageText = textContent.items
-          .map((item: any) => item.str)
+          .map((item: any) => {
+            // Handle both string items and objects with 'str' property
+            if (typeof item === 'string') return item;
+            return item.str || '';
+          })
           .join(" ");
         fullText += pageText + "\n";
       }
 
-      return fullText;
+      if (!fullText.trim()) {
+        throw new Error("No text could be extracted from the PDF. The PDF might be image-based or empty.");
+      }
+
+      return fullText.trim();
     } catch (err) {
+      console.error("PDF extraction error:", err);
+      if (err instanceof Error && err.message.includes("No text could be extracted")) {
+        throw err;
+      }
       throw new Error("Failed to extract text from PDF. Please ensure it's a valid PDF file.");
     }
   }

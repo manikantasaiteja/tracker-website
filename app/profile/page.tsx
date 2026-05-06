@@ -290,7 +290,9 @@ export default function ProfilePage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to upload resume");
+        // Show detailed error message
+        console.error("Upload error details:", data);
+        throw new Error(data.error || `Upload failed with status ${response.status}`);
       }
 
       setProfile((current) => ({
@@ -301,9 +303,21 @@ export default function ProfilePage() {
 
       setResumeMessage("Resume uploaded successfully!");
     } catch (err) {
-      setResumeError(
-        err instanceof Error ? err.message : "Failed to upload resume"
-      );
+      console.error("Resume upload error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to upload resume";
+      
+      // Provide helpful error messages
+      if (errorMessage.includes("bucket")) {
+        setResumeError(
+          "Storage not configured. Please run the setup script in Supabase. See RESUME_UPLOAD_FIX.md for instructions."
+        );
+      } else if (errorMessage.includes("policy")) {
+        setResumeError(
+          "Storage permissions not set. Please run the setup script in Supabase. See RESUME_UPLOAD_FIX.md for instructions."
+        );
+      } else {
+        setResumeError(errorMessage);
+      }
     } finally {
       setUploadingResume(false);
       // Reset file input

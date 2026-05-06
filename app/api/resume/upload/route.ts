@@ -100,8 +100,24 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error("Upload error:", uploadError);
+      
+      // Provide specific error messages
+      if (uploadError.message.includes("bucket")) {
+        return NextResponse.json(
+          { error: "Storage bucket 'resumes' not found. Please run setup-resume-storage.sql in Supabase." },
+          { status: 500 }
+        );
+      }
+      
+      if (uploadError.message.includes("policy")) {
+        return NextResponse.json(
+          { error: "Storage policies not configured. Please run setup-resume-storage.sql in Supabase." },
+          { status: 500 }
+        );
+      }
+      
       return NextResponse.json(
-        { error: "Failed to upload file" },
+        { error: `Upload failed: ${uploadError.message}` },
         { status: 500 }
       );
     }
