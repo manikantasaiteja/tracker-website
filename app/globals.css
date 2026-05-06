@@ -597,6 +597,7 @@ table {
   width: 100%;
   min-width: 1100px;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 thead {
@@ -609,6 +610,53 @@ td {
   text-align: left;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+}
+
+/* Column width constraints */
+th:nth-child(1), td:nth-child(1) { width: 12%; } /* Company */
+th:nth-child(2), td:nth-child(2) { width: 15%; } /* Role */
+th:nth-child(3), td:nth-child(3) { width: 9%; } /* Applied */
+th:nth-child(4), td:nth-child(4) { width: 9%; } /* Status */
+th:nth-child(5), td:nth-child(5) { width: 10%; } /* Location */
+th:nth-child(6), td:nth-child(6) { width: 13%; } /* CV */
+th:nth-child(7), td:nth-child(7) { width: 13%; } /* Cover Letter */
+th:nth-child(8), td:nth-child(8) { width: 13%; } /* Actions */
+
+/* Scrollable cells for Role, CV, and Cover Letter columns */
+td:nth-child(2), /* Role */
+td:nth-child(6), /* CV */
+td:nth-child(7)  /* Cover Letter */
+{
+  max-height: 120px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar styling for table cells */
+td:nth-child(2)::-webkit-scrollbar,
+td:nth-child(6)::-webkit-scrollbar,
+td:nth-child(7)::-webkit-scrollbar {
+  width: 6px;
+}
+
+td:nth-child(2)::-webkit-scrollbar-track,
+td:nth-child(6)::-webkit-scrollbar-track,
+td:nth-child(7)::-webkit-scrollbar-track {
+  background: var(--surface);
+  border-radius: 3px;
+}
+
+td:nth-child(2)::-webkit-scrollbar-thumb,
+td:nth-child(6)::-webkit-scrollbar-thumb,
+td:nth-child(7)::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+td:nth-child(2)::-webkit-scrollbar-thumb:hover,
+td:nth-child(6)::-webkit-scrollbar-thumb:hover,
+td:nth-child(7)::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }
 
 th {
@@ -625,30 +673,41 @@ tbody tr:hover {
 .role-cell,
 .row-actions {
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: stretch;
 }
 
 .row-actions .ghost-button {
   font-size: 0.78rem;
-  padding: 0.4rem 0.65rem;
+  padding: 0.4rem 0.5rem;
   min-width: auto;
+  white-space: nowrap;
 }
 
 .role-cell a {
   color: var(--accent);
-  font-size: 0.92rem;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   border-radius: 999px;
   padding: 0.42rem 0.72rem;
   font-size: 0.84rem;
   font-weight: 700;
   border: 1px solid transparent;
   transition: all 0.18s ease;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-badge--clickable {
@@ -1125,16 +1184,18 @@ tbody tr:hover {
 }
 
 .document-add-btn {
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.18s ease;
   white-space: nowrap;
+  width: 100%;
+  text-align: center;
 }
 
 .document-add-btn:hover {
@@ -1144,19 +1205,20 @@ tbody tr:hover {
 }
 
 .document-download-btn {
-  padding: 0.5rem 0.85rem;
+  padding: 0.5rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-soft);
   color: var(--text);
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.18s ease;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  max-width: 100%;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
