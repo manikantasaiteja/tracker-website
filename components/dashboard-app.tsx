@@ -471,6 +471,56 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
     setTheme(nextTheme);
   }
 
+  async function exportToExcel() {
+    try {
+      // Dynamically import xlsx to avoid SSR issues
+      const XLSX = await import("xlsx");
+      
+      // Prepare data for export
+      const exportData = applications.map((app) => ({
+        Company: app.company,
+        Role: app.role,
+        "Date Applied": app.date_applied,
+        Status: app.status,
+        Location: app.location || "Remote / n/a",
+        "Job URL": app.job_url || "",
+        "CV Attached": app.cv_file_name ? "Yes" : "No",
+        "Cover Letter Attached": app.cover_letter_file_name ? "Yes" : "No",
+        "Created At": new Date(app.created_at).toLocaleDateString(),
+      }));
+
+      // Create workbook and worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Applications");
+
+      // Set column widths
+      const columnWidths = [
+        { wch: 20 }, // Company
+        { wch: 25 }, // Role
+        { wch: 12 }, // Date Applied
+        { wch: 12 }, // Status
+        { wch: 15 }, // Location
+        { wch: 40 }, // Job URL
+        { wch: 15 }, // CV Attached
+        { wch: 20 }, // Cover Letter Attached
+        { wch: 12 }, // Created At
+      ];
+      worksheet["!cols"] = columnWidths;
+
+      // Generate filename with current date
+      const fileName = `Job_Applications_${new Date().toISOString().split("T")[0]}.xlsx`;
+
+      // Download file
+      XLSX.writeFile(workbook, fileName);
+      
+      setNotice(`Exported ${applications.length} applications to ${fileName}`);
+    } catch (err) {
+      setError("Failed to export data. Please try again.");
+      console.error("Export error:", err);
+    }
+  }
+
   const filteredApplications = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -559,9 +609,21 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
               stores real data in Supabase instead of local-only browser state.
             </p>
           </div>
-          <button className="primary-button" onClick={openCreateModal} type="button">
-            Add application
-          </button>
+          <div className="hero-panel__actions">
+            <button className="primary-button" onClick={openCreateModal} type="button">
+              Add application
+            </button>
+            {applications.length > 0 && (
+              <button 
+                className="secondary-button" 
+                onClick={exportToExcel} 
+                type="button"
+                title="Export all applications to Excel"
+              >
+                📊 Export to Excel
+              </button>
+            )}
+          </div>
         </section>
 
         <section className="stats-grid">
