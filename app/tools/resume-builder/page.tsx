@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { type FormEvent, useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { DashboardHeader } from "@/components/dashboard-header";
 
 type Suggestion = {
   section: string;
@@ -39,6 +40,7 @@ export default function ResumeBuilderPage() {
   const [jobDescription, setJobDescription] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [userLabel, setUserLabel] = useState("Guest");
 
   useEffect(() => {
     if (!supabase) return;
@@ -55,6 +57,15 @@ export default function ResumeBuilderPage() {
         router.replace("/login");
         return;
       }
+
+      const { data: profileData } = await supabase
+        .from("user_profiles")
+        .select("full_name")
+        .eq("id", session.user.id)
+        .single();
+
+      const fullName = profileData?.full_name || session.user.user_metadata.full_name || "";
+      setUserLabel(fullName || session.user.email || "Trackr user");
 
       setLoading(false);
     }
@@ -392,36 +403,10 @@ export default function ResumeBuilderPage() {
 
   return (
     <div className="dashboard-shell">
-      <header className="dashboard-header">
-        <Link className="brand-mark brand-mark--small" href="/dashboard">
-          <span className="brand-mark__icon">T</span>
-          <div>
-            <p className="brand-mark__eyebrow">Trackr</p>
-            <strong>Application tracker</strong>
-          </div>
-        </Link>
-
-        <nav className="dashboard-tabs">
-          <Link href="/dashboard" className="tab-link">
-            📊 Applications
-          </Link>
-          <Link href="/tools" className="tab-link active">
-            🛠️ Tools
-          </Link>
-          <Link href="/profile" className="tab-link">
-            👤 Profile
-          </Link>
-          <Link href="/about" className="tab-link">
-            ℹ️ About
-          </Link>
-        </nav>
-
-        <div className="dashboard-header__actions">
-          <button className="secondary-button" onClick={handleSignOut} type="button">
-            Sign out
-          </button>
-        </div>
-      </header>
+      <DashboardHeader
+        userLabel={userLabel}
+        onSignOut={handleSignOut}
+      />
 
       <main className="dashboard-main">
         <div className="resume-builder-layout">

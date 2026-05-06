@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { type FormEvent, useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { DashboardHeader } from "@/components/dashboard-header";
 
 export default function CoverLetterPage() {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function CoverLetterPage() {
   const [error, setError] = useState<string | null>(null);
   const [generatedCoverLetter, setGeneratedCoverLetter] = useState<string>("");
   const [userInfo, setUserInfo] = useState({ fullName: "", email: "", phone: "" });
+  const [userLabel, setUserLabel] = useState("Guest");
 
   useEffect(() => {
     if (!supabase) return;
@@ -52,6 +54,7 @@ export default function CoverLetterPage() {
       const email = session.user.email || "";
       const phone = profileData?.phone_number || "";
 
+      setUserLabel(fullName || email || "Trackr user");
       setUserInfo({ fullName, email, phone });
       setLoading(false);
     }
@@ -233,36 +236,10 @@ ${userInfo.fullName}`;
 
   return (
     <div className="dashboard-shell">
-      <header className="dashboard-header">
-        <Link className="brand-mark brand-mark--small" href="/dashboard">
-          <span className="brand-mark__icon">T</span>
-          <div>
-            <p className="brand-mark__eyebrow">Trackr</p>
-            <strong>Application tracker</strong>
-          </div>
-        </Link>
-
-        <nav className="dashboard-tabs">
-          <Link href="/dashboard" className="tab-link">
-            📊 Applications
-          </Link>
-          <Link href="/tools" className="tab-link active">
-            🛠️ Tools
-          </Link>
-          <Link href="/profile" className="tab-link">
-            👤 Profile
-          </Link>
-          <Link href="/about" className="tab-link">
-            ℹ️ About
-          </Link>
-        </nav>
-
-        <div className="dashboard-header__actions">
-          <button className="secondary-button" onClick={handleSignOut} type="button">
-            Sign out
-          </button>
-        </div>
-      </header>
+      <DashboardHeader
+        userLabel={userLabel}
+        onSignOut={handleSignOut}
+      />
 
       <main className="dashboard-main">
         <div className="tools-layout">

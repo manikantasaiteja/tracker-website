@@ -74,6 +74,7 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
   const [draft, setDraft] = useState<ApplicationDraft>(EMPTY_DRAFT);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -570,7 +571,7 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
           <span className="brand-mark__icon">T</span>
           <div>
             <p className="brand-mark__eyebrow">Trackr</p>
-            <strong>Application tracker</strong>
+            <strong>{userLabel}</strong>
           </div>
         </Link>
 
@@ -581,21 +582,88 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
           <Link href="/tools" className="tab-link">
             🛠️ Tools
           </Link>
-          <Link href="/profile" className="tab-link">
-            👤 Profile
-          </Link>
-          <Link href="/about" className="tab-link">
-            ℹ️ About
-          </Link>
         </nav>
 
         <div className="dashboard-header__actions">
           <button className="secondary-button" onClick={handleThemeToggle} type="button">
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
-          <button className="secondary-button" onClick={signOut} type="button">
-            Sign out
-          </button>
+          
+          <div className="profile-menu-container">
+            <button 
+              className="profile-menu-trigger" 
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              type="button"
+              aria-label="User menu"
+            >
+              <div className="profile-avatar">
+                {userLabel.charAt(0).toUpperCase()}
+              </div>
+            </button>
+            
+            {showProfileMenu && (
+              <>
+                <div 
+                  className="profile-menu-backdrop" 
+                  onClick={() => setShowProfileMenu(false)}
+                />
+                <div className="profile-menu-dropdown">
+                  <div className="profile-menu-header">
+                    <div className="profile-avatar-large">
+                      {userLabel.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="profile-menu-info">
+                      <strong>{userLabel}</strong>
+                      <span className="profile-menu-email">{applications.length} applications</span>
+                    </div>
+                  </div>
+                  
+                  <div className="profile-menu-divider" />
+                  
+                  <Link 
+                    href="/profile" 
+                    className="profile-menu-item"
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    <span className="profile-menu-icon">👤</span>
+                    <span>Profile</span>
+                  </Link>
+                  
+                  <Link 
+                    href="/help" 
+                    className="profile-menu-item"
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    <span className="profile-menu-icon">❓</span>
+                    <span>Help & FAQ</span>
+                  </Link>
+                  
+                  <Link 
+                    href="/about" 
+                    className="profile-menu-item"
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    <span className="profile-menu-icon">ℹ️</span>
+                    <span>About</span>
+                  </Link>
+                  
+                  <div className="profile-menu-divider" />
+                  
+                  <button 
+                    className="profile-menu-item profile-menu-item--danger" 
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      signOut();
+                    }}
+                    type="button"
+                  >
+                    <span className="profile-menu-icon">🚪</span>
+                    <span>Sign out</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -818,14 +886,6 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
                 </p>
                 <h2>{editingId ? "Update application" : "Add application"}</h2>
               </div>
-              <button
-                aria-label="Close modal"
-                className="secondary-button"
-                onClick={() => setShowModal(false)}
-                type="button"
-              >
-                Close
-              </button>
             </div>
 
             <form className="modal-form" onSubmit={saveApplication}>

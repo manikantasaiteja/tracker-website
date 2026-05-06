@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { DashboardHeader } from "@/components/dashboard-header";
 
 export default function AboutPage() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function AboutPage() {
 
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userLabel, setUserLabel] = useState("Guest");
 
   useEffect(() => {
     if (!supabase) return;
@@ -29,6 +31,18 @@ export default function AboutPage() {
       } = await supabase.auth.getSession();
 
       setIsAuthenticated(!!session?.user);
+      
+      if (session?.user) {
+        const { data: profileData } = await supabase
+          .from("user_profiles")
+          .select("full_name")
+          .eq("id", session.user.id)
+          .single();
+
+        const fullName = profileData?.full_name || session.user.user_metadata.full_name || "";
+        setUserLabel(fullName || session.user.email || "Trackr user");
+      }
+      
       setLoading(false);
     }
 
@@ -52,39 +66,21 @@ export default function AboutPage() {
 
   return (
     <div className="dashboard-shell">
-      <header className="dashboard-header">
-        <Link className="brand-mark brand-mark--small" href={isAuthenticated ? "/dashboard" : "/"}>
-          <span className="brand-mark__icon">T</span>
-          <div>
-            <p className="brand-mark__eyebrow">Trackr</p>
-            <strong>Application tracker</strong>
-          </div>
-        </Link>
-
-        {isAuthenticated ? (
-          <>
-            <nav className="dashboard-tabs">
-              <Link href="/dashboard" className="tab-link">
-                📊 Applications
-              </Link>
-              <Link href="/tools" className="tab-link">
-                🛠️ Tools
-              </Link>
-              <Link href="/profile" className="tab-link">
-                👤 Profile
-              </Link>
-              <Link href="/about" className="tab-link active">
-                ℹ️ About
-              </Link>
-            </nav>
-
-            <div className="dashboard-header__actions">
-              <button className="secondary-button" onClick={handleSignOut} type="button">
-                Sign out
-              </button>
+      {isAuthenticated ? (
+        <DashboardHeader
+          userLabel={userLabel}
+          onSignOut={handleSignOut}
+        />
+      ) : (
+        <header className="dashboard-header">
+          <Link className="brand-mark brand-mark--small" href="/">
+            <span className="brand-mark__icon">T</span>
+            <div>
+              <p className="brand-mark__eyebrow">Trackr</p>
+              <strong>Application tracker</strong>
             </div>
-          </>
-        ) : (
+          </Link>
+
           <div className="dashboard-header__actions">
             <Link href="/about" className="tab-link active">
               ℹ️ About
@@ -96,8 +92,8 @@ export default function AboutPage() {
               Get Started
             </Link>
           </div>
-        )}
-      </header>
+        </header>
+      )}
 
       <main className="dashboard-main">
         <div className="about-layout">

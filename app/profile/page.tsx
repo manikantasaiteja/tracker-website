@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { type FormEvent, useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { DashboardHeader } from "@/components/dashboard-header";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 
@@ -58,6 +59,7 @@ export default function ProfilePage() {
   const [uploadingResume, setUploadingResume] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeMessage, setResumeMessage] = useState<string | null>(null);
+  const [userLabel, setUserLabel] = useState("Guest");
 
   useEffect(() => {
     if (!supabase) return;
@@ -88,6 +90,7 @@ export default function ProfilePage() {
         const firstName = nameParts[0] || "";
         const lastName = nameParts.slice(1).join(" ") || "";
 
+        setUserLabel(fullName || session.user.email || "Trackr user");
         setProfile({
           firstName,
           lastName,
@@ -422,36 +425,10 @@ export default function ProfilePage() {
 
   return (
     <div className="dashboard-shell">
-      <header className="dashboard-header">
-        <Link className="brand-mark brand-mark--small" href="/dashboard">
-          <span className="brand-mark__icon">T</span>
-          <div>
-            <p className="brand-mark__eyebrow">Trackr</p>
-            <strong>Application tracker</strong>
-          </div>
-        </Link>
-
-        <nav className="dashboard-tabs">
-          <Link href="/dashboard" className="tab-link">
-            📊 Applications
-          </Link>
-          <Link href="/tools" className="tab-link">
-            🛠️ Tools
-          </Link>
-          <Link href="/profile" className="tab-link active">
-            👤 Profile
-          </Link>
-          <Link href="/about" className="tab-link">
-            ℹ️ About
-          </Link>
-        </nav>
-
-        <div className="dashboard-header__actions">
-          <button className="secondary-button" onClick={handleSignOut} type="button">
-            Sign out
-          </button>
-        </div>
-      </header>
+      <DashboardHeader
+        userLabel={userLabel}
+        onSignOut={handleSignOut}
+      />
 
       <main className="dashboard-main">
         <div className="profile-layout">
@@ -742,115 +719,6 @@ export default function ProfilePage() {
                 {changingPassword ? "Updating..." : "Update password"}
               </button>
             </form>
-          </section>
-
-          {/* Help & FAQ */}
-          <section className="profile-section-card">
-            <div className="section-header">
-              <div className="section-header-left">
-                <span className="section-icon">❓</span>
-                <h2 className="section-title-main">Help & FAQ</h2>
-              </div>
-            </div>
-
-            <div className="faq-list">
-              {[
-                {
-                  q: "How do I add a new job application?",
-                  a: 'Click the "Add application" button on the dashboard. Fill in the required fields: Company name, Role/Position, and Date Applied. You can also add optional information like Location, Job URL, and upload your CV and Cover Letter. Click "Create entry" to save your application.',
-                },
-                {
-                  q: "How do I update the status of an application?",
-                  a: "Simply click on the status badge (e.g., 'Applied') in the applications table. It will automatically cycle through the stages: Applied → Interview → Offer → Rejected → Ghosted → Withdrawn. This makes it easy to track your application progress with a single click.",
-                },
-                {
-                  q: "Can I attach my CV and cover letter to an application?",
-                  a: 'Yes! When adding or editing an application, scroll down to find the CV and Cover Letter upload sections. Click "Choose File" to select your document (PDF, DOC, or DOCX formats supported). Once uploaded, you can download these documents anytime by clicking the file name in the table. Each application can have its own unique CV and cover letter.',
-                },
-                {
-                  q: "How do I download my uploaded CV or cover letter?",
-                  a: "In the applications table, look for the CV and Cover Letter columns. If you've uploaded documents, you'll see the filename with an emoji icon (📄 for CV, 📝 for Cover Letter). Simply click on the filename to download the document to your computer.",
-                },
-                {
-                  q: "Can I edit an existing application?",
-                  a: 'Yes! Click the "Edit" button in the Actions column of any application row. This opens the same form you used to create the application, pre-filled with the current data. Make your changes and click "Save changes" to update the application.',
-                },
-                {
-                  q: "How do I delete an application?",
-                  a: 'Click the "Delete" button in the Actions column of the application you want to remove. You\'ll be asked to confirm the deletion. Note: This action cannot be undone, and any uploaded documents associated with that application will also be deleted.',
-                },
-                {
-                  q: "Can I search and filter my applications?",
-                  a: "Yes! Use the search bar at the top of the applications table to search by company name, role, or location. You can also use the status dropdown filter to view only applications with a specific status (Applied, Interview, Offer, etc.). Combine both for more precise filtering.",
-                },
-                {
-                  q: "What do the different status badges mean?",
-                  a: "Applied (blue): You've submitted your application. Interview (yellow): You've been invited to interview. Offer (green): You've received a job offer. Rejected (red): Your application was declined. Ghosted (gray): No response from the company. Withdrawn (purple): You withdrew your application.",
-                },
-                {
-                  q: "How do I change my profile information?",
-                  a: 'Go to your profile page by clicking your name in the dashboard header. Click the "Edit" button in the Personal Information section. You can update your first name, surname, and phone number. Click "Save changes" when done. Note: Your email address cannot be changed for security reasons.',
-                },
-                {
-                  q: "How do I change my password?",
-                  a: 'Navigate to your profile page and scroll to the "Change password" section. Enter your current password, then your new password twice to confirm. Your new password must be at least 8 characters long. Click "Update password" to save the changes.',
-                },
-                {
-                  q: "Can I switch between light and dark mode?",
-                  a: 'Yes! Look for the theme toggle button in the dashboard header (it says "Light mode" or "Dark mode" depending on your current theme). Click it to instantly switch between themes. Your preference is saved automatically and will persist across sessions.',
-                },
-                {
-                  q: "Is my data stored securely?",
-                  a: "Absolutely! All your data is stored in Supabase, a secure PostgreSQL database with enterprise-grade security. We use Row Level Security (RLS) policies to ensure you can only access your own data. Your uploaded documents are stored in encrypted storage buckets. Your password is hashed and never stored in plain text.",
-                },
-                {
-                  q: "Can I export my application data?",
-                  a: "Currently, there's no built-in export feature, but you can manually copy your data from the table. We're planning to add CSV/Excel export functionality in a future update so you can easily backup or analyze your application history.",
-                },
-                {
-                  q: "What file formats are supported for CV and cover letter uploads?",
-                  a: "You can upload documents in PDF (.pdf), Microsoft Word (.doc), and Microsoft Word (.docx) formats. These are the most common formats accepted by employers. Make sure your files are under 5MB for optimal upload performance.",
-                },
-                {
-                  q: "How many applications can I track?",
-                  a: "There's no limit! You can track as many job applications as you need. The dashboard shows statistics for all your applications, and you can use search and filters to manage large numbers of applications efficiently.",
-                },
-                {
-                  q: "What happens if I forget my password?",
-                  a: 'On the login page, click the "Forgot password?" link below the password field. Enter your email address and you\'ll receive a password reset link. Click the link in the email to set a new password. The reset link expires after a certain time for security.',
-                },
-                {
-                  q: "Can I access Trackr from multiple devices?",
-                  a: "Yes! Trackr is a web application, so you can access it from any device with a web browser (computer, tablet, or phone). Your data is synced in real-time across all devices. Just log in with your email and password.",
-                },
-                {
-                  q: "How do I change my profile photo?",
-                  a: "Profile photos are automatically generated from your initials (first letter of your first name and surname). This creates a unique, colorful avatar for each user. Custom photo uploads are not currently supported, but may be added in future updates.",
-                },
-                {
-                  q: "What should I do if I encounter an error?",
-                  a: "Most errors will display a message explaining what went wrong. Common issues include network problems or invalid data. Try refreshing the page or logging out and back in. If the problem persists, check your internet connection. For persistent issues, contact support.",
-                },
-                {
-                  q: "Can I undo a status change?",
-                  a: "Yes! If you accidentally click a status badge and change the status, simply click it again to cycle through to the correct status. You can also use the Edit button to manually select any status from the dropdown menu.",
-                },
-              ].map((faq, index) => (
-                <div key={index} className="faq-item">
-                  <button
-                    className="faq-question"
-                    onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}
-                    type="button"
-                  >
-                    <span>{faq.q}</span>
-                    <span className="faq-icon">{expandedFaq === index ? "−" : "+"}</span>
-                  </button>
-                  {expandedFaq === index ? (
-                    <div className="faq-answer">{faq.a}</div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
           </section>
 
           {/* Danger Zone */}
