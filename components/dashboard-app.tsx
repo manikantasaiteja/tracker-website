@@ -75,6 +75,24 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showColumnFilter, setShowColumnFilter] = useState(false);
+  const [showAdvancedSearchPanel, setShowAdvancedSearchPanel] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState({
+    company: true,
+    role: true,
+    applied: true,
+    status: true,
+    location: true,
+    cv: true,
+    coverLetter: true,
+    actions: true,
+  });
+  const [searchFilters, setSearchFilters] = useState<Array<{
+    id: string;
+    column: string;
+    operator: "=" | "!=";
+    value: string;
+  }>>([]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -522,6 +540,38 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
     }
   }
 
+  const addSearchFilter = () => {
+    setSearchFilters([
+      ...searchFilters,
+      {
+        id: Date.now().toString(),
+        column: "company",
+        operator: "=",
+        value: "",
+      },
+    ]);
+  };
+
+  const removeSearchFilter = (id: string) => {
+    setSearchFilters(searchFilters.filter((filter) => filter.id !== id));
+  };
+
+  const updateSearchFilter = (id: string, field: "column" | "operator" | "value", value: string) => {
+    setSearchFilters(
+      searchFilters.map((filter) =>
+        filter.id === id ? { ...filter, [field]: value } : filter
+      )
+    );
+  };
+
+  const clearAllSearchFilters = () => {
+    setSearchFilters([]);
+  };
+
+  const getActiveFiltersCount = () => {
+    return searchFilters.filter(f => f.value).length;
+  };
+
   const filteredApplications = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -535,9 +585,42 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
       const matchesStatus =
         statusFilter === "All" || item.status === statusFilter;
 
-      return matchesQuery && matchesStatus;
+      // Advanced search filters
+      const matchesAdvancedSearch = searchFilters.every((filter) => {
+        if (!filter.value) return true;
+
+        let itemValue = "";
+        switch (filter.column) {
+          case "company":
+            itemValue = item.company;
+            break;
+          case "role":
+            itemValue = item.role;
+            break;
+          case "applied":
+            itemValue = item.date_applied;
+            break;
+          case "status":
+            itemValue = item.status;
+            break;
+          case "location":
+            itemValue = item.location ?? "";
+            break;
+        }
+
+        const filterValue = filter.value.toLowerCase();
+        const itemValueLower = itemValue.toLowerCase();
+
+        if (filter.operator === "=") {
+          return itemValueLower.includes(filterValue);
+        } else {
+          return !itemValueLower.includes(filterValue);
+        }
+      });
+
+      return matchesQuery && matchesStatus && matchesAdvancedSearch;
     });
-  }, [applications, search, statusFilter]);
+  }, [applications, search, statusFilter, searchFilters]);
 
   const stats = useMemo(() => {
     const counts = APPLICATION_STATUSES.reduce(
@@ -681,16 +764,6 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
             <button className="primary-button" onClick={openCreateModal} type="button">
               Add application
             </button>
-            {applications.length > 0 && (
-              <button 
-                className="secondary-button" 
-                onClick={exportToExcel} 
-                type="button"
-                title="Export all applications to Excel"
-              >
-                📊 Export to Excel
-              </button>
-            )}
           </div>
         </section>
 
@@ -751,48 +824,262 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
         {notice ? <div className="auth-banner auth-banner--success">{notice}</div> : null}
 
         <section className="table-panel">
+          <div className="table-controls">
+            <div className="filter-search-container">
+              <button 
+                className={`filter-toggle-btn ${showAdvancedSearchPanel ? 'active' : ''} ${getActiveFiltersCount() > 0 ? 'has-filters' : ''}`}
+                onClick={() => setShowAdvancedSearchPanel(!showAdvancedSearchPanel)}
+                type="button"
+                title="Advanced filters"
+              >
+                <span className="filter-icon">⚙️</span>
+                <span className="filter-text">Filters</span>
+                {getActiveFiltersCount() > 0 && (
+                  <span className="filter-badge">{getActiveFiltersCount()}</span>
+                )}
+              </button>
+              
+              {showAdvancedSearchPanel && (
+                <>
+                  <div 
+                    className="filter-panel-backdrop" 
+                    onClick={() => setShowAdvancedSearchPanel(false)}
+                  />
+                  <div className="filter-dropdown-panel">
+                    <div className="filter-panel-header">
+                      <h4>Advanced Filters</h4>
+                      <div className="filter-panel-actions">
+                        <button 
+                          className="filter-action-btn filter-action-btn--add" 
+                          onClick={addSearchFilter}
+                          type="button"
+                        >
+                          <span>+</span> Add Filter
+                        </button>
+                        {searchFilters.length > 0 && (
+                          <button 
+                            className="filter-action-btn filter-action-btn--clear" 
+                            onClick={clearAllSearchFilters}
+                            type="button"
+                          >
+                            Clear All
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="filter-panel-body">
+                      {searchFilters.length === 0 ? (
+                        <div className="filter-empty-state">
+                          <span className="filter-empty-icon">🔍</span>
+                          <p>No filters applied</p>
+                          <span className="filter-empty-hint">Click "Add Filter" to start</span>
+                        </div>
+                      ) : (
+                        <div className="filter-list">
+                          {searchFilters.map((filter, index) => (
+                            <div key={filter.id} className="filter-item">
+                              <div className="filter-item-header">
+                                <span className="filter-item-number">{index + 1}</span>
+                                <button
+                                  className="filter-item-remove"
+                                  onClick={() => removeSearchFilter(filter.id)}
+                                  type="button"
+                                  title="Remove filter"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                              <div className="filter-item-body">
+                                <select
+                                  className="filter-select"
+                                  value={filter.column}
+                                  onChange={(e) => updateSearchFilter(filter.id, "column", e.target.value)}
+                                >
+                                  <option value="company">Company</option>
+                                  <option value="role">Role</option>
+                                  <option value="applied">Applied Date</option>
+                                  <option value="status">Status</option>
+                                  <option value="location">Location</option>
+                                </select>
+                                
+                                <select
+                                  className="filter-select"
+                                  value={filter.operator}
+                                  onChange={(e) => updateSearchFilter(filter.id, "operator", e.target.value as "=" | "!=")}
+                                >
+                                  <option value="=">Contains</option>
+                                  <option value="!=">Does not contain</option>
+                                </select>
+                                
+                                <input
+                                  type="text"
+                                  className="filter-input"
+                                  placeholder="Enter value..."
+                                  value={filter.value}
+                                  onChange={(e) => updateSearchFilter(filter.id, "value", e.target.value)}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            
+            <div className="table-controls-right">
+              <button 
+                className="table-control-btn" 
+                onClick={() => setShowColumnFilter(!showColumnFilter)}
+                type="button"
+                title="Toggle column visibility"
+              >
+                <span>👁️</span> Columns
+              </button>
+              {applications.length > 0 && (
+                <button 
+                  className="table-control-btn table-control-btn--primary" 
+                  onClick={exportToExcel} 
+                  type="button"
+                  title="Export to Excel"
+                >
+                  <span>📊</span> Export
+                </button>
+              )}
+            </div>
+          </div>
+
+          {showColumnFilter && (
+            <div className="column-filter-panel">
+              <div className="column-filter-header">
+                <h4>Show/Hide Columns</h4>
+                <button 
+                  className="column-filter-close"
+                  onClick={() => setShowColumnFilter(false)}
+                  type="button"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="column-filter-grid">
+                <label>
+                  <input 
+                    type="checkbox" 
+                    checked={visibleColumns.company}
+                    onChange={(e) => setVisibleColumns({...visibleColumns, company: e.target.checked})}
+                  />
+                  <span>Company</span>
+                </label>
+                <label>
+                  <input 
+                    type="checkbox" 
+                    checked={visibleColumns.role}
+                    onChange={(e) => setVisibleColumns({...visibleColumns, role: e.target.checked})}
+                  />
+                  <span>Role</span>
+                </label>
+                <label>
+                  <input 
+                    type="checkbox" 
+                    checked={visibleColumns.applied}
+                    onChange={(e) => setVisibleColumns({...visibleColumns, applied: e.target.checked})}
+                  />
+                  <span>Applied</span>
+                </label>
+                <label>
+                  <input 
+                    type="checkbox" 
+                    checked={visibleColumns.status}
+                    onChange={(e) => setVisibleColumns({...visibleColumns, status: e.target.checked})}
+                  />
+                  <span>Status</span>
+                </label>
+                <label>
+                  <input 
+                    type="checkbox" 
+                    checked={visibleColumns.location}
+                    onChange={(e) => setVisibleColumns({...visibleColumns, location: e.target.checked})}
+                  />
+                  <span>Location</span>
+                </label>
+                <label>
+                  <input 
+                    type="checkbox" 
+                    checked={visibleColumns.cv}
+                    onChange={(e) => setVisibleColumns({...visibleColumns, cv: e.target.checked})}
+                  />
+                  <span>CV</span>
+                </label>
+                <label>
+                  <input 
+                    type="checkbox" 
+                    checked={visibleColumns.coverLetter}
+                    onChange={(e) => setVisibleColumns({...visibleColumns, coverLetter: e.target.checked})}
+                  />
+                  <span>Cover Letter</span>
+                </label>
+                <label>
+                  <input 
+                    type="checkbox" 
+                    checked={visibleColumns.actions}
+                    onChange={(e) => setVisibleColumns({...visibleColumns, actions: e.target.checked})}
+                  />
+                  <span>Actions</span>
+                </label>
+              </div>
+            </div>
+          )}
+
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Company</th>
-                  <th>Role</th>
-                  <th>Applied</th>
-                  <th>Status</th>
-                  <th>Location</th>
-                  <th>CV</th>
-                  <th>Cover Letter</th>
-                  <th>Actions</th>
+                  {visibleColumns.company && <th>Company</th>}
+                  {visibleColumns.role && <th>Role</th>}
+                  {visibleColumns.applied && <th>Applied</th>}
+                  {visibleColumns.status && <th>Status</th>}
+                  {visibleColumns.location && <th>Location</th>}
+                  {visibleColumns.cv && <th>CV</th>}
+                  {visibleColumns.coverLetter && <th>Cover Letter</th>}
+                  {visibleColumns.actions && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {filteredApplications.length ? (
                   filteredApplications.map((item) => (
                     <tr key={item.id}>
-                      <td>{item.company}</td>
-                      <td>
-                        <div className="role-cell">
-                          <strong>{item.role}</strong>
-                          {item.job_url ? (
-                            <a href={item.job_url} rel="noreferrer" target="_blank">
-                              Open role
-                            </a>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td>{item.date_applied}</td>
-                      <td>
-                        <button
-                          className={`status-badge status-badge--${item.status} status-badge--clickable`}
-                          onClick={() => updateApplicationStatus(item.id, item.status)}
-                          type="button"
-                          title="Click to advance to next status"
-                        >
-                          {item.status}
-                        </button>
-                      </td>
-                      <td>{item.location ?? "Remote / n/a"}</td>
-                      <td>
+                      {visibleColumns.company && <td>{item.company}</td>}
+                      {visibleColumns.role && (
+                        <td>
+                          <div className="role-cell">
+                            <strong>{item.role}</strong>
+                            {item.job_url ? (
+                              <a href={item.job_url} rel="noreferrer" target="_blank">
+                                Open role
+                              </a>
+                            ) : null}
+                          </div>
+                        </td>
+                      )}
+                      {visibleColumns.applied && <td>{item.date_applied}</td>}
+                      {visibleColumns.status && (
+                        <td>
+                          <button
+                            className={`status-badge status-badge--${item.status} status-badge--clickable`}
+                            onClick={() => updateApplicationStatus(item.id, item.status)}
+                            type="button"
+                            title="Click to advance to next status"
+                          >
+                            {item.status}
+                          </button>
+                        </td>
+                      )}
+                      {visibleColumns.location && <td>{item.location ?? "Remote / n/a"}</td>}
+                      {visibleColumns.cv && (
+                        <td>
                         {item.cv_file_url && item.cv_file_name ? (
                           <button
                             className="document-download-btn"
@@ -811,45 +1098,50 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
                             + Add CV
                           </button>
                         )}
-                      </td>
-                      <td>
-                        {item.cover_letter_file_url && item.cover_letter_file_name ? (
-                          <button
-                            className="document-download-btn"
-                            onClick={() => downloadFile(item.cover_letter_file_url!, item.cover_letter_file_name!)}
-                            type="button"
-                            title="Download Cover Letter"
-                          >
-                            📝 {item.cover_letter_file_name}
-                          </button>
-                        ) : (
-                          <button
-                            className="document-add-btn"
-                            onClick={() => openEditModal(item)}
-                            type="button"
-                          >
-                            + Add CL
-                          </button>
-                        )}
-                      </td>
-                      <td>
-                        <div className="row-actions">
-                          <button
-                            className="ghost-button"
-                            onClick={() => openEditModal(item)}
-                            type="button"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="ghost-button ghost-button--danger"
-                            onClick={() => deleteApplication(item.id)}
-                            type="button"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+                        </td>
+                      )}
+                      {visibleColumns.coverLetter && (
+                        <td>
+                          {item.cover_letter_file_url && item.cover_letter_file_name ? (
+                            <button
+                              className="document-download-btn"
+                              onClick={() => downloadFile(item.cover_letter_file_url!, item.cover_letter_file_name!)}
+                              type="button"
+                              title="Download Cover Letter"
+                            >
+                              📝 {item.cover_letter_file_name}
+                            </button>
+                          ) : (
+                            <button
+                              className="document-add-btn"
+                              onClick={() => openEditModal(item)}
+                              type="button"
+                            >
+                              + Add CL
+                            </button>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.actions && (
+                        <td>
+                          <div className="row-actions">
+                            <button
+                              className="ghost-button"
+                              onClick={() => openEditModal(item)}
+                              type="button"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="ghost-button ghost-button--danger"
+                              onClick={() => deleteApplication(item.id)}
+                              type="button"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 ) : (
