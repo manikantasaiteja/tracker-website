@@ -15,6 +15,8 @@ import {
 import { Table, Button, Space, Tag, ConfigProvider, theme as antTheme } from 'antd';
 import { DownloadOutlined, EditOutlined, DeleteOutlined, FileTextOutlined, FilePdfOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import type { ResizeCallbackData } from 'react-resizable';
+import { Resizable } from 'react-resizable';
 import * as XLSX from 'xlsx';
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import {
@@ -78,6 +80,16 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    company: 120,
+    role: 150,
+    date_applied: 100,
+    status: 110,
+    location: 120,
+    cv: 50,
+    cover_letter: 50,
+    actions: 180,
+  });
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -522,6 +534,42 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
     }
   }
 
+  // Resizable column handler
+  const handleResize = (key: string) => (_: React.SyntheticEvent, { size }: ResizeCallbackData) => {
+    setColumnWidths((prev) => ({
+      ...prev,
+      [key]: size.width,
+    }));
+  };
+
+  // Resizable title component
+  const ResizableTitle = (props: any) => {
+    const { onResize, width, ...restProps } = props;
+
+    if (!width) {
+      return <th {...restProps} />;
+    }
+
+    return (
+      <Resizable
+        width={width}
+        height={0}
+        handle={
+          <span
+            className="react-resizable-handle"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          />
+        }
+        onResize={onResize}
+        draggableOpts={{ enableUserSelectHack: false }}
+      >
+        <th {...restProps} />
+      </Resizable>
+    );
+  };
+
   // Status color mapping
   const getStatusColor = (status: ApplicationStatus) => {
     const colors: Record<ApplicationStatus, string> = {
@@ -546,9 +594,9 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
         <div style={{ padding: 8 }}>
           <input
             placeholder="Search company"
-            value={selectedKeys[0]}
+            value={selectedKeys[0] as string}
             onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
+            onKeyDown={(e) => e.key === 'Enter' && confirm()}
             style={{
               width: 188,
               marginBottom: 8,
@@ -574,7 +622,11 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
         </div>
       ),
       onFilter: (value, record) => record.company.toLowerCase().includes(String(value).toLowerCase()),
-      width: 150,
+      width: columnWidths.company,
+      onHeaderCell: () => ({
+        width: columnWidths.company,
+        onResize: handleResize('company'),
+      }),
     },
     {
       title: 'Role',
@@ -585,9 +637,9 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
         <div style={{ padding: 8 }}>
           <input
             placeholder="Search role"
-            value={selectedKeys[0]}
+            value={selectedKeys[0] as string}
             onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
+            onKeyDown={(e) => e.key === 'Enter' && confirm()}
             style={{
               width: 188,
               marginBottom: 8,
@@ -613,7 +665,12 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
         </div>
       ),
       onFilter: (value, record) => record.role.toLowerCase().includes(String(value).toLowerCase()),
-      width: 200,
+      width: columnWidths.role,
+      ellipsis: true,
+      onHeaderCell: () => ({
+        width: columnWidths.role,
+        onResize: handleResize('role'),
+      }),
       render: (text, record) => (
         <div>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>{text}</div>
@@ -630,7 +687,11 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
       dataIndex: 'date_applied',
       key: 'date_applied',
       sorter: (a, b) => new Date(a.date_applied).getTime() - new Date(b.date_applied).getTime(),
-      width: 120,
+      width: columnWidths.date_applied,
+      onHeaderCell: () => ({
+        width: columnWidths.date_applied,
+        onResize: handleResize('date_applied'),
+      }),
     },
     {
       title: 'Status',
@@ -638,7 +699,11 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
       key: 'status',
       filters: APPLICATION_STATUSES.map(status => ({ text: status, value: status })),
       onFilter: (value, record) => record.status === value,
-      width: 130,
+      width: columnWidths.status,
+      onHeaderCell: () => ({
+        width: columnWidths.status,
+        onResize: handleResize('status'),
+      }),
       render: (status: ApplicationStatus, record) => (
         <Tag 
           color={getStatusColor(status)}
@@ -658,9 +723,9 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
         <div style={{ padding: 8 }}>
           <input
             placeholder="Search location"
-            value={selectedKeys[0]}
+            value={selectedKeys[0] as string}
             onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
+            onKeyDown={(e) => e.key === 'Enter' && confirm()}
             style={{
               width: 188,
               marginBottom: 8,
@@ -686,13 +751,22 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
         </div>
       ),
       onFilter: (value, record) => (record.location || '').toLowerCase().includes(String(value).toLowerCase()),
-      width: 150,
+      width: columnWidths.location,
+      ellipsis: true,
+      onHeaderCell: () => ({
+        width: columnWidths.location,
+        onResize: handleResize('location'),
+      }),
       render: (text) => text || 'Remote / n/a',
     },
     {
       title: 'CV',
       key: 'cv',
-      width: 60,
+      width: columnWidths.cv,
+      onHeaderCell: () => ({
+        width: columnWidths.cv,
+        onResize: handleResize('cv'),
+      }),
       render: (_, record) => {
         if (record.cv_file_url && record.cv_file_name) {
           return (
@@ -718,7 +792,11 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
     {
       title: 'CL',
       key: 'cover_letter',
-      width: 60,
+      width: columnWidths.cover_letter,
+      onHeaderCell: () => ({
+        width: columnWidths.cover_letter,
+        onResize: handleResize('cover_letter'),
+      }),
       render: (_, record) => {
         if (record.cover_letter_file_url && record.cover_letter_file_name) {
           return (
@@ -745,7 +823,11 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 150,
+      width: columnWidths.actions,
+      onHeaderCell: () => ({
+        width: columnWidths.actions,
+        onResize: handleResize('actions'),
+      }),
       render: (_, record) => (
         <Space size="small">
           <Button
@@ -766,7 +848,7 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
         </Space>
       ),
     },
-  ], []);
+  ], [columnWidths]);
 
   const stats = useMemo(() => {
     const counts = APPLICATION_STATUSES.reduce(
@@ -1002,7 +1084,11 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
                 showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} applications`,
                 pageSizeOptions: ['10', '20', '50', '100'],
               }}
-              scroll={{ x: 1200 }}
+              components={{
+                header: {
+                  cell: ResizableTitle,
+                },
+              }}
               size="middle"
               bordered
               loading={loading}

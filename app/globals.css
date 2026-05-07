@@ -10146,3 +10146,45 @@ html {
 .ag-grid-wrapper {
   display: none;
 }
+
+
+/* React Resizable Styles */
+.react-resizable {
+  position: relative;
+}
+
+.react-resizable-handle {
+  position: absolute;
+  width: 10px;
+  height: 100%;
+  bottom: 0;
+  right: -5px;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 30%;
+  background: var(--border-strong);
+  border-radius: 2px;
+  transition: background 0.2s ease;
+}
+
+.react-resizable-handle:hover::after {
+  background: var(--accent);
+  width: 3px;
+}
+
+:root[data-theme="light"] .react-resizable-handle::after {
+  background: rgba(79, 95, 255, 0.3);
+}
+
+:root[data-theme="light"] .react-resizable-handle:hover::after {
+  background: var(--accent);
+}
