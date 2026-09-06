@@ -3015,13 +3015,11 @@ tbody tr:hover {
 }
 
 .cover-letter-result {
-  margin-top: 3rem;
-  padding: 2.5rem;
-  border-top: 3px solid var(--accent);
-  background: linear-gradient(135deg, var(--surface-soft), var(--surface));
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-  animation: slideInUp 0.5s ease;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  gap: 1rem;
 }
 
 @keyframes slideInUp {
@@ -3084,14 +3082,14 @@ tbody tr:hover {
 }
 
 .cover-letter-preview {
-  padding: 2.5rem;
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
   background: var(--surface);
   color: var(--text);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
-  max-height: 600px;
-  overflow-y: auto;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+  min-height: 0;
 }
 
 [data-theme="light"] .cover-letter-preview {
@@ -3296,8 +3294,10 @@ tbody tr:hover {
 .tool-panel--results {
   position: sticky;
   top: 1.5rem;
-  max-height: calc(100vh - 120px);
+  height: calc(100vh - 120px);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Empty state */
