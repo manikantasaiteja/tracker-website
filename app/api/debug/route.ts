@@ -6,9 +6,7 @@ export async function GET() {
   const redirectUri = process.env.GOOGLE_REDIRECT_URI;
 
   return NextResponse.json({
-    GOOGLE_CLIENT_ID: clientId
-      ? `${clientId.slice(0, 20)}...${clientId.slice(-10)}`
-      : "MISSING",
+    GOOGLE_CLIENT_ID: clientId ?? "MISSING",
     GOOGLE_CLIENT_SECRET: clientSecret
       ? `set (ends in ...${clientSecret.slice(-6)})`
       : "MISSING",

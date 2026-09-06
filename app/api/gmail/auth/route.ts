@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
       state,
     });
 
+    console.log("[/api/gmail/auth] Generated auth URL:", authUrl);
     return NextResponse.json({ url: authUrl });
   } catch (error) {
     console.error("[/api/gmail/auth] Error:", error);
