@@ -21,18 +21,34 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     if (!supabase) return;
 
-    // Check if user has a valid recovery session
+    // Listen for PASSWORD_RECOVERY event — Supabase fires this when the user
+    // clicks the reset link. getSession() alone runs too early (before the
+    // token in the URL hash is exchanged), so we need the auth state listener.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+          setIsValidSession(true);
+          setChecking(false);
+        } else if (event === "SIGNED_OUT" || (!session && event !== "INITIAL_SESSION")) {
+          setChecking(false);
+        }
+      }
+    );
+
+    // Also check existing session as fallback (user already on recovery session)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setIsValidSession(true);
-      } else {
-        setError("Invalid or expired reset link. Please request a new one.");
       }
+      setChecking(false);
     });
+
+    return () => subscription.unsubscribe();
   }, [supabase]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -119,7 +135,12 @@ export default function ResetPasswordPage() {
             Choose a strong password to secure your account.
           </p>
 
-          {isValidSession ? (
+          {checking ? (
+            <div className="auth-form">
+              <div className="route-loader__pulse" style={{ margin: "2rem auto" }} />
+              <p style={{ textAlign: "center", color: "var(--text-muted)" }}>Verifying reset link...</p>
+            </div>
+          ) : isValidSession ? (
             <form className="auth-form" onSubmit={handleSubmit}>
               <label className="auth-field">
                 <span className="required-field">New Password</span>
@@ -166,9 +187,9 @@ export default function ResetPasswordPage() {
             </form>
           ) : (
             <div className="auth-form">
-              {error ? (
-                <div className="auth-banner auth-banner--error">{error}</div>
-              ) : null}
+              <div className="auth-banner auth-banner--error">
+                Invalid or expired reset link. Please request a new one.
+              </div>
               <Link href="/login" className="primary-button auth-submit" style={{ textAlign: "center", display: "block" }}>
                 Back to Login
               </Link>
