@@ -51,8 +51,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ url: authUrl });
   } catch (error) {
     console.error("[/api/gmail/auth] Error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to generate auth URL" },
+      { error: `Failed to generate auth URL: ${message}` },
       { status: 500 }
     );
   }
