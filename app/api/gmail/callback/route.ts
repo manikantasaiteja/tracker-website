@@ -12,9 +12,10 @@ import { createOAuth2Client } from "@/lib/gmail/oauth";
 import { getSupabaseAdmin } from "@/lib/gmail/supabase-admin";
 
 export async function GET(request: NextRequest) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  // Always redirect back to the profile page (where the Connect button lives)
-  const profileUrl = `${appUrl}/profile`;
+  // Use the request's own origin as fallback so redirects always work
+  const origin = process.env.NEXT_PUBLIC_APP_URL
+    ?? new URL(request.url).origin;
+  const profileUrl = `${origin}/profile`;
 
   try {
     const { searchParams } = new URL(request.url);

@@ -4,6 +4,7 @@ export async function GET() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
   return NextResponse.json({
     GOOGLE_CLIENT_ID_START: clientId ? clientId.slice(0, 30) : "MISSING",
@@ -13,5 +14,6 @@ export async function GET() {
       ? `set (ends in ...${clientSecret.slice(-6)})`
       : "MISSING",
     GOOGLE_REDIRECT_URI: redirectUri ?? "MISSING",
+    NEXT_PUBLIC_APP_URL: appUrl ?? "MISSING",
   });
 }
