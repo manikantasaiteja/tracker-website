@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
 
     // ── Get the connected Gmail address ───────────────────────────────────
     oauth2Client.setCredentials(tokens);
-    const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client as any });
     const { data: googleUser } = await oauth2.userinfo.get();
     const gmailEmail = googleUser.email ?? "";
 

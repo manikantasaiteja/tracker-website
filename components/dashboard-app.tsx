@@ -433,6 +433,7 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
     const statusOrder: ApplicationStatus[] = [
       "Applied",
       "Interview",
+      "Assessment",
       "Offer",
       "Rejected",
       "Ghosted",
@@ -581,6 +582,7 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
     const colors: Record<ApplicationStatus, string> = {
       Applied: 'blue',
       Interview: 'orange',
+      Assessment: 'cyan',
       Offer: 'green',
       Rejected: 'red',
       Ghosted: 'default',

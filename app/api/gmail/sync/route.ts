@@ -16,7 +16,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createOAuth2Client } from "@/lib/gmail/oauth";
 import { getSupabaseAdmin } from "@/lib/gmail/supabase-admin";
-import { parseGmailMessage } from "@/lib/gmail/parser";
+import { parseGmailMessage, type GmailMessagePayload } from "@/lib/gmail/parser";
 
 // How many emails to fetch per sync (avoids memory spikes)
 const BATCH_SIZE = 50;
@@ -86,7 +86,8 @@ export async function POST(request: NextRequest) {
         .eq("user_id", user.id);
     });
 
-    const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gmail = google.gmail({ version: "v1", auth: oauth2Client as any });
 
     // ── 4. Resolve the "Jobs" label ID ────────────────────────────────────
     const { data: labelsData } = await gmail.users.labels.list({ userId: "me" });
@@ -156,9 +157,12 @@ export async function POST(request: NextRequest) {
           format: "full",
         });
 
-        const parsed = parseGmailMessage(
-          fullMessage as gmail_v1.Schema$Message & { id: string }
-        );
+        const parsed = parseGmailMessage({
+          id: fullMessage.id!,
+          snippet: fullMessage.snippet ?? undefined,
+          internalDate: fullMessage.internalDate ?? undefined,
+          payload: fullMessage.payload as GmailMessagePayload | undefined,
+        });
         if (!parsed) continue;
 
         const dateApplied = parsed.dateReceived.split("T")[0] ?? new Date().toISOString().split("T")[0];

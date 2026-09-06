@@ -1,6 +1,7 @@
 export const APPLICATION_STATUSES = [
   "Applied",
   "Interview",
+  "Assessment",
   "Offer",
   "Rejected",
   "Ghosted",
