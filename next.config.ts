@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  turbopack: undefined, // disable turbopack, use webpack instead
   async headers() {
     return [
       {

@@ -80,6 +80,12 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      return parseInt(window.localStorage.getItem("trackr-page-size") ?? "20", 10) || 20;
+    }
+    return 20;
+  });
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     company: 120,
     role: 150,
@@ -1079,10 +1085,16 @@ export function DashboardApp({ initialSessionError }: DashboardAppProps) {
               dataSource={applications}
               rowKey="id"
               pagination={{
-                pageSize: 20,
+                pageSize: pageSize,
                 showSizeChanger: true,
                 showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} applications`,
                 pageSizeOptions: ['10', '20', '50', '100'],
+                onShowSizeChange: (_current: number, size: number) => {
+                  setPageSize(size);
+                  if (typeof window !== "undefined") {
+                    window.localStorage.setItem("trackr-page-size", String(size));
+                  }
+                },
               }}
               components={{
                 header: {
