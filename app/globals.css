@@ -3086,6 +3086,7 @@ tbody tr:hover {
 .cover-letter-preview {
   padding: 2.5rem;
   background: #ffffff;
+  color: var(--text);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
   max-height: 600px;
@@ -3100,7 +3101,7 @@ tbody tr:hover {
 }
 
 [data-theme="dark"] .cover-letter-preview {
-  background: var(--bg);
+  background: var(--surface);
   border-color: rgba(124, 140, 255, 0.2);
   box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.3);
 }
@@ -3113,6 +3114,10 @@ tbody tr:hover {
   color: var(--text);
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+[data-theme="dark"] .cover-letter-preview pre {
+  color: var(--text);
 }
 
 /* Scrollbar for preview */
