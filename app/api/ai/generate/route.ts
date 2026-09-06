@@ -2,7 +2,7 @@
  * POST /api/ai/generate
  *
  * Shared AI endpoint for all tools — powered by Groq (free forever).
- * Uses llama-3.3-70b-versatile via Groq's OpenAI-compatible API.
+ * Uses openai/gpt-oss-120b via Groq's OpenAI-compatible API.
  *
  * Tool types:
  *  - "ats"          → ATS score + matched/missing keywords + suggestions
@@ -119,7 +119,7 @@ async function callGroq(prompt: string, apiKey: string): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       messages: [
         {
           role: "system",
