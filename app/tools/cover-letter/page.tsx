@@ -117,27 +117,50 @@ export default function CoverLetterPage() {
   }
 
   async function downloadPdf() {
-    // Dynamically import jsPDF to keep bundle size down
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ unit: "mm", format: "a4" });
 
-    const margin = 20;
+    const margin = 25;
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const maxWidth = pageWidth - margin * 2;
-    const lineHeight = 7;
+    const lineHeight = 6;
     let y = margin;
 
-    doc.setFont("times", "normal");
-    doc.setFontSize(11);
+    const lines = generatedCoverLetter.split("\n");
 
-    const lines = doc.splitTextToSize(generatedCoverLetter, maxWidth);
-    for (const line of lines) {
-      if (y + lineHeight > doc.internal.pageSize.getHeight() - margin) {
-        doc.addPage();
-        y = margin;
+    for (const rawLine of lines) {
+      // Detect lines that should be bold:
+      // - First non-empty lines (sender name/address block, typically first 6 lines)
+      // - Lines that look like a date (contain month names or date patterns)
+      // - Subject lines
+      // - Salutation (Dear ...)
+      // - Sign-off (Kind regards, Yours sincerely, etc.)
+      const trimmed = rawLine.trim();
+      const isBlank = trimmed === "";
+
+      const isBold =
+        /^(dear |to whom|hiring|re:|subject:|kind regards|yours sincerely|yours faithfully|best regards|sincerely)/i.test(trimmed) ||
+        /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(trimmed) ||
+        /^\d{1,2}[\s\/\-]\w+[\s\/\-]\d{4}/.test(trimmed);
+
+      if (isBlank) {
+        y += lineHeight * 0.6;
+        continue;
       }
-      doc.text(line, margin, y);
-      y += lineHeight;
+
+      doc.setFont("helvetica", isBold ? "bold" : "normal");
+      doc.setFontSize(12);
+
+      const wrapped = doc.splitTextToSize(trimmed, maxWidth);
+      for (const wline of wrapped) {
+        if (y + lineHeight > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        doc.text(wline, margin, y);
+        y += lineHeight;
+      }
     }
 
     doc.save(`Cover_Letter_${new Date().toISOString().split("T")[0]}.pdf`);
