@@ -89,19 +89,15 @@ export default function ATSCheckerPage() {
     if (!finalCvText.trim() || !jobDescription.trim()) {
       setError("Please provide your CV and the job description."); return;
     }
-
     setAnalyzing(true); setError(null); setResult(null);
-
     try {
       const { data: { session } } = await supabase!.auth.getSession();
       if (!session) { router.replace("/login"); return; }
-
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ tool: "ats", cvText: finalCvText, jobDescription }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "AI analysis failed");
       setResult(data);
@@ -118,22 +114,21 @@ export default function ATSCheckerPage() {
     <div className="dashboard-shell">
       <DashboardHeader userLabel={userLabel} onSignOut={handleSignOut} />
       <main className="dashboard-main">
-        <div className="tools-layout">
-          <section className="tool-card">
+        <div className="tool-split-layout">
+
+          {/* ── LEFT: Input panel ── */}
+          <section className="tool-panel tool-panel--input">
             <div className="tool-header">
               <div className="tool-icon-svg">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               </div>
               <div>
                 <h2 className="tool-title">ATS Score Checker</h2>
-                <p className="tool-description">
-                  Upload your CV and paste the job description. Gemini AI analyses keyword alignment, scores your match, and gives specific suggestions to pass ATS filters.
-                </p>
+                <p className="tool-description">Upload your CV and paste the job description to get your ATS score and keyword analysis.</p>
               </div>
             </div>
 
             <form className="ats-form" onSubmit={analyzeATS}>
-              {/* Input mode toggle */}
               <div className="input-mode-selector">
                 <label className="mode-option">
                   <input type="radio" name="inputMode" value="pdf" checked={inputMode === "pdf"}
@@ -158,7 +153,7 @@ export default function ATSCheckerPage() {
                       <input type="file" accept=".pdf" onChange={handleCVUpload} className="file-input-hidden" id="cv-upload-ats" />
                       <label htmlFor="cv-upload-ats" className="file-upload-label">
                         {extracting ? <><span className="upload-icon">⏳</span><span className="upload-text">Extracting text...</span></>
-                          : cvFile ? <><span className="upload-icon">✅</span><span className="upload-text"><strong>{cvFile.name}</strong><span className="file-size">{cvText.length} characters extracted</span></span></>
+                          : cvFile ? <><span className="upload-icon">✅</span><span className="upload-text"><strong>{cvFile.name}</strong><span className="file-size">{cvText.length} chars extracted</span></span></>
                           : <><span className="upload-icon">📄</span><span className="upload-text"><strong>Click to upload your CV</strong><span className="file-hint">PDF format only</span></span></>}
                       </label>
                     </div>
@@ -167,10 +162,9 @@ export default function ATSCheckerPage() {
                   <label className="ats-label">
                     <span className="label-text">
                       <strong className="required-field">Paste Your CV</strong>
-                      <span className="label-hint">Paste the full text of your CV</span>
                     </span>
                     <textarea className="ats-textarea" value={manualCvText} onChange={(e) => setManualCvText(e.target.value)}
-                      placeholder="Paste your CV text here..." rows={10} required={inputMode === "text"} />
+                      placeholder="Paste your CV text here..." rows={8} required={inputMode === "text"} />
                     <span className="char-count">{manualCvText.length} characters</span>
                   </label>
                 )}
@@ -181,7 +175,7 @@ export default function ATSCheckerPage() {
                     <span className="label-hint">Paste the full job posting</span>
                   </span>
                   <textarea className="ats-textarea" value={jobDescription} onChange={(e) => setJobDescription(e.target.value)}
-                    placeholder="Paste the full job description here..." rows={10} required />
+                    placeholder="Paste the full job description here..." rows={8} required />
                   <span className="char-count">{jobDescription.length} characters</span>
                 </label>
               </div>
@@ -193,6 +187,26 @@ export default function ATSCheckerPage() {
                 {analyzing ? "Analysing with AI..." : "Analyse ATS Score"}
               </button>
             </form>
+          </section>
+
+          {/* ── RIGHT: Results panel ── */}
+          <section className="tool-panel tool-panel--results">
+            {!result && !analyzing && (
+              <div className="results-empty">
+                <div className="results-empty-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                </div>
+                <h3>Your ATS analysis will appear here</h3>
+                <p>Upload your CV and paste a job description, then click Analyse to see your score, matched keywords, and AI suggestions.</p>
+              </div>
+            )}
+
+            {analyzing && (
+              <div className="results-loading">
+                <div className="route-loader__pulse" />
+                <p>Analysing your CV against the job description...</p>
+              </div>
+            )}
 
             {result && (
               <div className="ats-results">
@@ -243,6 +257,7 @@ export default function ATSCheckerPage() {
               </div>
             )}
           </section>
+
         </div>
       </main>
     </div>

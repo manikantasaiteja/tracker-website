@@ -49,13 +49,13 @@ export default function ResumeBuilderPage() {
   const [jobDescription, setJobDescription] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [userLabel, setUserLabel] = useState("Guest");
 
   // Apply saved theme on mount
   useEffect(() => {
     const saved = window.localStorage.getItem("trackr-theme");
     document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
   }, []);
-  const [userLabel, setUserLabel] = useState("Guest");
 
   useEffect(() => {
     if (!supabase) return;
@@ -97,13 +97,11 @@ export default function ResumeBuilderPage() {
     try {
       const { data: { session } } = await supabase!.auth.getSession();
       if (!session) { router.replace("/login"); return; }
-
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ tool: "resume", cvText, jobDescription }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "AI analysis failed");
       setResult(data);
@@ -120,17 +118,17 @@ export default function ResumeBuilderPage() {
     <div className="dashboard-shell">
       <DashboardHeader userLabel={userLabel} onSignOut={handleSignOut} />
       <main className="dashboard-main">
-        <div className="resume-builder-layout">
-          <section className="tool-card">
+        <div className="tool-split-layout">
+
+          {/* ── LEFT: Input panel ── */}
+          <section className="tool-panel tool-panel--input">
             <div className="tool-header">
               <div className="tool-icon-svg">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
               </div>
               <div>
                 <h2 className="tool-title">AI Resume Optimizer</h2>
-                <p className="tool-description">
-                  Upload your CV and paste a job description. Gemini AI gives you a match score, identifies missing keywords, and provides section-by-section suggestions to tailor your resume for the role.
-                </p>
+                <p className="tool-description">Upload your CV and paste a job description to get a match score and section-by-section suggestions.</p>
               </div>
             </div>
 
@@ -147,7 +145,7 @@ export default function ResumeBuilderPage() {
                       {extracting
                         ? <><span className="upload-icon">⏳</span><span className="upload-text">Extracting text...</span></>
                         : cvFile
-                        ? <><span className="upload-icon">✅</span><span className="upload-text"><strong>{cvFile.name}</strong><span className="file-size">{cvText.length} characters extracted</span></span></>
+                        ? <><span className="upload-icon">✅</span><span className="upload-text"><strong>{cvFile.name}</strong><span className="file-size">{cvText.length} chars extracted</span></span></>
                         : <><span className="upload-icon">📄</span><span className="upload-text"><strong>Click to upload your CV</strong><span className="file-hint">PDF format only</span></span></>}
                     </label>
                   </div>
@@ -159,7 +157,7 @@ export default function ResumeBuilderPage() {
                     <span className="label-hint">Paste the complete job posting</span>
                   </span>
                   <textarea className="ats-textarea" value={jobDescription} onChange={(e) => setJobDescription(e.target.value)}
-                    placeholder="Paste the full job description here..." rows={12} required />
+                    placeholder="Paste the full job description here..." rows={10} required />
                   <span className="char-count">{jobDescription.length} characters</span>
                 </label>
               </div>
@@ -171,6 +169,26 @@ export default function ResumeBuilderPage() {
                 {analyzing ? "Analysing with AI..." : "Analyse & Get Suggestions"}
               </button>
             </form>
+          </section>
+
+          {/* ── RIGHT: Results panel ── */}
+          <section className="tool-panel tool-panel--results">
+            {!result && !analyzing && (
+              <div className="results-empty">
+                <div className="results-empty-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </div>
+                <h3>Your optimisation suggestions will appear here</h3>
+                <p>Upload your CV and paste a job description, then click Analyse to get your match score, missing keywords, and prioritised suggestions.</p>
+              </div>
+            )}
+
+            {analyzing && (
+              <div className="results-loading">
+                <div className="route-loader__pulse" />
+                <p>Optimising your resume against the job description...</p>
+              </div>
+            )}
 
             {result && (
               <div className="optimization-results">
@@ -199,7 +217,7 @@ export default function ResumeBuilderPage() {
                 {result.missingKeywords.length > 0 && (
                   <div className="missing-keywords-section">
                     <h3>Missing Keywords ({result.missingKeywords.length})</h3>
-                    <p className="section-description">Add these keywords from the job description to your CV where relevant:</p>
+                    <p className="section-description">Add these to your CV where relevant:</p>
                     <div className="keyword-tags">
                       {result.missingKeywords.map((kw, i) => <span key={i} className="keyword-tag missing-tag">{kw}</span>)}
                     </div>
@@ -215,7 +233,7 @@ export default function ResumeBuilderPage() {
                         <div className="suggestion-header">
                           <div className="suggestion-meta">
                             <span className={`priority-badge priority-${s.priority}`}>
-                              {s.priority === "high" ? "High Priority" : s.priority === "medium" ? "Medium Priority" : "Low Priority"}
+                              {s.priority === "high" ? "High" : s.priority === "medium" ? "Medium" : "Low"}
                             </span>
                             <span className="section-badge">{s.section}</span>
                             <span className={`type-badge type-${s.type}`}>
@@ -234,6 +252,7 @@ export default function ResumeBuilderPage() {
               </div>
             )}
           </section>
+
         </div>
       </main>
     </div>

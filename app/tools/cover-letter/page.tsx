@@ -26,7 +26,7 @@ export default function CoverLetterPage() {
     typeof window !== "undefined" ? createBrowserSupabaseClient() : null
   );
 
-  // Apply saved theme on mount so CSS variables resolve correctly
+  // Apply saved theme on mount
   useEffect(() => {
     const saved = window.localStorage.getItem("trackr-theme");
     document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
@@ -84,17 +84,14 @@ export default function CoverLetterPage() {
       setError("Please upload your CV and provide the job description."); return;
     }
     setGenerating(true); setError(null); setGeneratedCoverLetter("");
-
     try {
       const { data: { session } } = await supabase!.auth.getSession();
       if (!session) { router.replace("/login"); return; }
-
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ tool: "cover-letter", cvText, jobDescription, userInfo }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "AI generation failed");
       setGeneratedCoverLetter(data.coverLetter);
@@ -109,7 +106,7 @@ export default function CoverLetterPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function downloadCoverLetter() {
+  function downloadTxt() {
     const blob = new Blob([generatedCoverLetter], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -117,6 +114,33 @@ export default function CoverLetterPage() {
     a.download = `Cover_Letter_${new Date().toISOString().split("T")[0]}.txt`;
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  async function downloadPdf() {
+    // Dynamically import jsPDF to keep bundle size down
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const maxWidth = pageWidth - margin * 2;
+    const lineHeight = 7;
+    let y = margin;
+
+    doc.setFont("times", "normal");
+    doc.setFontSize(11);
+
+    const lines = doc.splitTextToSize(generatedCoverLetter, maxWidth);
+    for (const line of lines) {
+      if (y + lineHeight > doc.internal.pageSize.getHeight() - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(line, margin, y);
+      y += lineHeight;
+    }
+
+    doc.save(`Cover_Letter_${new Date().toISOString().split("T")[0]}.pdf`);
   }
 
   if (loading || !supabase) {
@@ -127,17 +151,17 @@ export default function CoverLetterPage() {
     <div className="dashboard-shell">
       <DashboardHeader userLabel={userLabel} onSignOut={handleSignOut} />
       <main className="dashboard-main">
-        <div className="tools-layout">
-          <section className="tool-card">
+        <div className="tool-split-layout">
+
+          {/* ── LEFT: Input panel ── */}
+          <section className="tool-panel tool-panel--input">
             <div className="tool-header">
               <div className="tool-icon-svg">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
               </div>
               <div>
                 <h2 className="tool-title">AI Cover Letter Generator</h2>
-                <p className="tool-description">
-                  Upload your CV and paste the job description. Gemini AI writes a personalised, professional cover letter that highlights your most relevant experience for the specific role.
-                </p>
+                <p className="tool-description">Upload your CV and paste the job description to generate a personalised cover letter.</p>
               </div>
             </div>
 
@@ -159,7 +183,7 @@ export default function CoverLetterPage() {
                 <div className="tab-content">
                   <div className="tab-content-header">
                     <h3>Upload Your CV</h3>
-                    <p>Upload your CV in PDF format. Gemini AI will use your real experience to write the letter.</p>
+                    <p>Upload your CV in PDF format. AI will use your real experience to write the letter.</p>
                   </div>
                   <div className="ats-input-group">
                     <div className="ats-label">
@@ -174,7 +198,7 @@ export default function CoverLetterPage() {
                           {extracting
                             ? <><span className="upload-icon">⏳</span><span className="upload-text">Extracting text...</span></>
                             : cvFile
-                            ? <><span className="upload-icon">✅</span><span className="upload-text"><strong>{cvFile.name}</strong><span className="file-size">{cvText.length} characters extracted</span></span></>
+                            ? <><span className="upload-icon">✅</span><span className="upload-text"><strong>{cvFile.name}</strong><span className="file-size">{cvText.length} chars extracted</span></span></>
                             : <><span className="upload-icon">📄</span><span className="upload-text"><strong>Click to upload your CV</strong><span className="file-hint">PDF format only</span></span></>}
                         </label>
                       </div>
@@ -196,7 +220,7 @@ export default function CoverLetterPage() {
                 <div className="tab-content">
                   <div className="tab-content-header">
                     <h3>Job Description</h3>
-                    <p>Paste the full job posting. Gemini AI uses it to personalise every sentence of your cover letter.</p>
+                    <p>Paste the full job posting. AI uses it to personalise every sentence of your cover letter.</p>
                   </div>
                   <div className="ats-input-group">
                     <div className="ats-label">
@@ -206,7 +230,7 @@ export default function CoverLetterPage() {
                       </span>
                       <textarea className="ats-textarea" value={jobDescription}
                         onChange={(e) => setJobDescription(e.target.value)}
-                        placeholder="Paste the full job description here..." required rows={16} />
+                        placeholder="Paste the full job description here..." required rows={14} />
                       <span className="char-count">{jobDescription.length} characters</span>
                     </div>
                   </div>
@@ -223,18 +247,40 @@ export default function CoverLetterPage() {
                 </div>
               )}
             </form>
+          </section>
 
-            {/* Result */}
+          {/* ── RIGHT: Results panel ── */}
+          <section className="tool-panel tool-panel--results">
+            {!generatedCoverLetter && !generating && (
+              <div className="results-empty">
+                <div className="results-empty-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                </div>
+                <h3>Your cover letter will appear here</h3>
+                <p>Upload your CV and paste the job description, then click Generate to create your personalised cover letter.</p>
+              </div>
+            )}
+
+            {generating && (
+              <div className="results-loading">
+                <div className="route-loader__pulse" />
+                <p>Writing your personalised cover letter...</p>
+              </div>
+            )}
+
             {generatedCoverLetter && (
               <div className="cover-letter-result">
                 <div className="result-header">
                   <h3>Your AI-Generated Cover Letter</h3>
                   <div className="result-actions">
                     <button className="secondary-button" onClick={copyCoverLetter} type="button">
-                      {copied ? "Copied!" : "Copy"}
+                      {copied ? "✓ Copied!" : "Copy"}
                     </button>
-                    <button className="secondary-button" onClick={downloadCoverLetter} type="button">
-                      Download
+                    <button className="secondary-button" onClick={downloadTxt} type="button">
+                      ↓ TXT
+                    </button>
+                    <button className="primary-button" onClick={downloadPdf} type="button">
+                      ↓ PDF
                     </button>
                   </div>
                 </div>
@@ -244,6 +290,7 @@ export default function CoverLetterPage() {
               </div>
             )}
           </section>
+
         </div>
       </main>
     </div>
