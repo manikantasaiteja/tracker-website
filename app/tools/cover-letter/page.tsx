@@ -26,6 +26,12 @@ export default function CoverLetterPage() {
     typeof window !== "undefined" ? createBrowserSupabaseClient() : null
   );
 
+  // Apply saved theme on mount so CSS variables resolve correctly
+  useEffect(() => {
+    const saved = window.localStorage.getItem("trackr-theme");
+    document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [extracting, setExtracting] = useState(false);

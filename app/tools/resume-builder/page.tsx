@@ -49,6 +49,12 @@ export default function ResumeBuilderPage() {
   const [jobDescription, setJobDescription] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Apply saved theme on mount
+  useEffect(() => {
+    const saved = window.localStorage.getItem("trackr-theme");
+    document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
+  }, []);
   const [userLabel, setUserLabel] = useState("Guest");
 
   useEffect(() => {

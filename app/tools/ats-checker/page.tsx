@@ -46,6 +46,12 @@ export default function ATSCheckerPage() {
   const [error, setError] = useState<string | null>(null);
   const [userLabel, setUserLabel] = useState("Guest");
 
+  // Apply saved theme on mount
+  useEffect(() => {
+    const saved = window.localStorage.getItem("trackr-theme");
+    document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
+  }, []);
+
   useEffect(() => {
     if (!supabase) return;
     async function checkAuth() {

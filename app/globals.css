@@ -3085,7 +3085,7 @@ tbody tr:hover {
 
 .cover-letter-preview {
   padding: 2.5rem;
-  background: #ffffff;
+  background: var(--surface);
   color: var(--text);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
@@ -3096,12 +3096,14 @@ tbody tr:hover {
 
 [data-theme="light"] .cover-letter-preview {
   background: #ffffff;
+  color: #1a2332;
   border-color: rgba(99, 102, 241, 0.15);
   box-shadow: inset 0 1px 4px rgba(99, 102, 241, 0.06);
 }
 
 [data-theme="dark"] .cover-letter-preview {
   background: var(--surface);
+  color: #f0f4ff;
   border-color: rgba(124, 140, 255, 0.2);
   box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.3);
 }
@@ -3111,13 +3113,9 @@ tbody tr:hover {
   font-family: "Georgia", "Times New Roman", serif;
   font-size: 1rem;
   line-height: 1.9;
-  color: var(--text);
+  color: inherit;
   white-space: pre-wrap;
   word-wrap: break-word;
-}
-
-[data-theme="dark"] .cover-letter-preview pre {
-  color: var(--text);
 }
 
 /* Scrollbar for preview */
