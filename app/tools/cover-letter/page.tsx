@@ -125,47 +125,38 @@ export default function CoverLetterPage() {
     const marginL = 20;
     const marginR = 20;
     const contentW = pageW - marginL - marginR;       // 170
-    const lineH = 6.5;
-    let y = 18;
+    const lineH = 5.5;
+    let y = 15;
 
-    // ── Helper: add text with auto page-break ──────────────────
-    function addLine(
+    // ── Helper: write wrapped text, returns new y ──────────────
+    function writeText(
       text: string,
       x: number,
-      opts: {
-        bold?: boolean;
-        size?: number;
-        align?: "left" | "right" | "center" | "justify";
-        maxWidth?: number;
-      } = {}
-    ) {
-      const { bold = false, size = 11, align = "left", maxWidth = contentW } = opts;
+      opts: { bold?: boolean; size?: number; align?: "left" | "right" | "center" } = {}
+    ): void {
+      const { bold = false, size = 10.5, align = "left" } = opts;
       doc.setFont("helvetica", bold ? "bold" : "normal");
       doc.setFontSize(size);
-      if (y + lineH > pageH - 15) { doc.addPage(); y = 18; }
-      doc.text(text, x, y, { align, maxWidth });
-      y += lineH;
+      const maxW = align === "right" ? contentW : contentW - (x - marginL);
+      const wrapped = doc.splitTextToSize(text, maxW);
+      for (const line of wrapped) {
+        if (y + lineH > pageH - 12) { doc.addPage(); y = 15; }
+        doc.text(line, x, y, { align });
+        y += lineH;
+      }
     }
 
-    function addBlank(fraction = 1) { y += lineH * fraction; }
+    function gap(mm = 4) { y += mm; }
 
-    // ── 1. Name header (bold, right-aligned) ───────────────────
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.text(userInfo.fullName || "Applicant", pageW - marginR, y, { align: "right" });
-    y += 7;
+    // ── Parse the letter into structured parts ─────────────────
+    const rawLines = generatedCoverLetter.split("\n").map(l => l.trim()).filter((l, i, arr) => {
+      // remove blank leading lines
+      if (i === 0 && !l) return false;
+      return true;
+    });
 
-    // Horizontal rule under name
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.4);
-    doc.line(marginL, y, pageW - marginR, y);
-    y += 6;
-
-    // ── 2. Parse the cover letter into sections ─────────────────
-    const rawLines = generatedCoverLetter.split("\n");
-
-    // Collect address lines (lines 1–5 before "Hiring Team" or similar)
-    const addressLines: string[] = [];
+    // Collect sections by scanning through lines
+    const senderLines: string[] = [];
     const recipientLines: string[] = [];
     let dateStr = "";
     let subjectLine = "";
@@ -174,119 +165,150 @@ export default function CoverLetterPage() {
     let signOff = "";
     let signerName = "";
 
-    let section: "address" | "recipient" | "body" | "signoff" = "address";
+    type Phase = "sender" | "recipient" | "body" | "signoff";
+    let phase: Phase = "sender";
     let bodyBuffer = "";
+    const fullName = userInfo.fullName || "";
 
-    for (const raw of rawLines) {
-      const line = raw.trim();
+    for (const line of rawLines) {
       if (!line) {
-        if (bodyBuffer) { bodyParagraphs.push(bodyBuffer.trim()); bodyBuffer = ""; }
+        if (phase === "body" && bodyBuffer.trim()) {
+          bodyParagraphs.push(bodyBuffer.trim());
+          bodyBuffer = "";
+        }
         continue;
       }
 
-      // Detect date
-      if (/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(line) && line.length < 60) {
-        dateStr = line; continue;
+      // Skip if line is just the user's full name repeated (header already shows it)
+      if (line === fullName && senderLines.length === 0 && phase === "sender") continue;
+
+      // Date detection
+      if (/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(line) && line.length < 70) {
+        dateStr = line;
+        if (phase === "sender") phase = "recipient";
+        continue;
       }
-      // Detect subject
-      if (/^(subject|re|betreff)[\s:]/i.test(line)) {
-        subjectLine = line; section = "body"; continue;
+
+      // Subject line
+      if (/^(subject|re:|betreff)[\s:]/i.test(line)) {
+        subjectLine = line;
+        phase = "body";
+        continue;
       }
-      // Detect salutation
+
+      // Salutation
       if (/^dear\b/i.test(line)) {
-        salutation = line; section = "body"; continue;
-      }
-      // Detect sign-off
-      if (/^(kind regards|yours sincerely|yours faithfully|best regards|sincerely|mit freundlichen)/i.test(line)) {
-        signOff = line; section = "signoff"; continue;
-      }
-      if (section === "signoff") { signerName = line; continue; }
-
-      // Detect recipient block (Hiring Team, company name, city)
-      if (/^(hiring|to whom|hr |human resources|fraunhofer|company|organisation|organization)/i.test(line) || section === "recipient") {
-        section = "recipient";
-        recipientLines.push(line); continue;
-      }
-
-      // Address lines (sender) — first section
-      if (section === "address") {
-        // Switch to recipient after 6 address lines
-        if (addressLines.length >= 6) { section = "recipient"; recipientLines.push(line); }
-        else addressLines.push(line);
+        salutation = line;
+        phase = "body";
         continue;
       }
 
-      if (section === "body") { bodyBuffer += (bodyBuffer ? " " : "") + line; }
-    }
-    if (bodyBuffer) bodyParagraphs.push(bodyBuffer.trim());
+      // Sign-off
+      if (/^(kind regards|yours sincerely|yours faithfully|best regards|sincerely,|mit freundlichen)/i.test(line)) {
+        if (phase === "body" && bodyBuffer.trim()) {
+          bodyParagraphs.push(bodyBuffer.trim());
+          bodyBuffer = "";
+        }
+        signOff = line;
+        phase = "signoff";
+        continue;
+      }
+      if (phase === "signoff") {
+        signerName = line;
+        continue;
+      }
 
-    // ── 3. Right-aligned address block ─────────────────────────
-    for (const al of addressLines) {
-      addLine(al, pageW - marginR, { align: "right", size: 10 });
-    }
-    addBlank(0.5);
+      // Recipient block starts with known keywords or after sender
+      if (phase === "sender" && senderLines.length >= 4 &&
+        /^(hiring|to whom|hr |human resources|dear|the |fraunhofer|company|bloom|campus|berlin|munich|hamburg|london|new york)/i.test(line)) {
+        phase = "recipient";
+      }
 
-    // ── 4. Recipient (left) + Date (right) side by side ────────
+      if (phase === "sender") {
+        senderLines.push(line);
+      } else if (phase === "recipient") {
+        recipientLines.push(line);
+      } else if (phase === "body") {
+        bodyBuffer += (bodyBuffer ? " " : "") + line;
+      }
+    }
+    if (bodyBuffer.trim()) bodyParagraphs.push(bodyBuffer.trim());
+
+    // ── 1. Name header bold right-aligned ─────────────────────
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text(fullName, pageW - marginR, y, { align: "right" });
+    y += 6;
+
+    // Horizontal rule
+    doc.setDrawColor(50, 50, 50);
+    doc.setLineWidth(0.35);
+    doc.line(marginL, y, pageW - marginR, y);
+    y += 5;
+
+    // ── 2. Sender address right-aligned ───────────────────────
+    for (const sl of senderLines) {
+      writeText(sl, pageW - marginR, { align: "right", size: 10 });
+    }
+    gap(4);
+
+    // ── 3. Recipient left + Date right (same row area) ─────────
     const recipientStartY = y;
     for (const rl of recipientLines) {
-      addLine(rl, marginL, { bold: true, size: 10 });
+      const isBoldLine = /^(hiring|to whom|hr |the |fraunhofer|bloom|campus)/i.test(rl);
+      writeText(rl, marginL, { bold: isBoldLine, size: 10 });
     }
-    const recipientEndY = y;
-
-    // Place date at the vertical midpoint of the recipient block, right-aligned
+    // Place date at vertical midpoint of recipient block
     if (dateStr) {
-      const midY = recipientStartY + (recipientEndY - recipientStartY) / 2;
+      const midY = recipientStartY + (y - recipientStartY) / 2;
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.text(dateStr, pageW - marginR, midY, { align: "right" });
     }
+    gap(5);
 
-    addBlank(1.2);
-
-    // ── 5. Subject line ────────────────────────────────────────
+    // ── 4. Subject line ────────────────────────────────────────
     if (subjectLine) {
-      // Bold "Subject:" prefix, normal rest
-      const colonIdx = subjectLine.indexOf(":");
-      if (colonIdx !== -1) {
-        const prefix = subjectLine.slice(0, colonIdx + 1);
-        const rest = subjectLine.slice(colonIdx + 1);
+      const colon = subjectLine.indexOf(":");
+      if (colon !== -1) {
+        const prefix = subjectLine.slice(0, colon + 1);
+        const rest = subjectLine.slice(colon + 1).trim();
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        const prefixW = doc.getTextWidth(prefix + " ");
-        if (y + lineH > pageH - 15) { doc.addPage(); y = 18; }
+        doc.setFontSize(10.5);
+        const pw = doc.getTextWidth(prefix + " ");
+        if (y + lineH > pageH - 12) { doc.addPage(); y = 15; }
         doc.text(prefix, marginL, y);
         doc.setFont("helvetica", "normal");
-        doc.text(rest, marginL + prefixW, y);
+        const restWrapped = doc.splitTextToSize(rest, contentW - pw);
+        doc.text(restWrapped[0] ?? "", marginL + pw, y);
         y += lineH;
+        for (let i = 1; i < restWrapped.length; i++) {
+          if (y + lineH > pageH - 12) { doc.addPage(); y = 15; }
+          doc.text(restWrapped[i], marginL + pw, y);
+          y += lineH;
+        }
       } else {
-        addLine(subjectLine, marginL, { bold: true });
+        writeText(subjectLine, marginL, { bold: true });
       }
-      addBlank(0.4);
+      gap(2);
     }
 
-    // ── 6. Salutation ──────────────────────────────────────────
+    // ── 5. Salutation ──────────────────────────────────────────
     if (salutation) {
-      addLine(salutation, marginL, { size: 11 });
-      addBlank(0.8);
+      writeText(salutation, marginL, { size: 10.5 });
+      gap(3);
     }
 
-    // ── 7. Body paragraphs (justified) ────────────────────────
+    // ── 6. Body paragraphs — plain left-aligned (no justify) ───
     for (const para of bodyParagraphs) {
-      const wrapped = doc.splitTextToSize(para, contentW);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
-      for (const wline of wrapped) {
-        if (y + lineH > pageH - 15) { doc.addPage(); y = 18; }
-        doc.text(wline, marginL, y, { align: "justify", maxWidth: contentW });
-        y += lineH;
-      }
-      addBlank(0.8);
+      writeText(para, marginL, { size: 10.5 });
+      gap(3);
     }
 
-    // ── 8. Sign-off ────────────────────────────────────────────
+    // ── 7. Sign-off ────────────────────────────────────────────
     if (signOff) {
-      addLine(signOff, marginL, { size: 11 });
-      addLine(signerName || userInfo.fullName, marginL, { size: 11 });
+      writeText(signOff, marginL, { size: 10.5 });
+      writeText(signerName || fullName, marginL, { size: 10.5 });
     }
 
     doc.save(`Cover_Letter_${new Date().toISOString().split("T")[0]}.pdf`);
