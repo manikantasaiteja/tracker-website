@@ -10805,7 +10805,66 @@ html {
    MOBILE & TABLET RESPONSIVE FIXES
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Base: prevent horizontal scroll on all screens ── */
+/* ── Tablet portrait: header fix (768px–1024px) ── */
+@media (max-width: 1024px) and (orientation: portrait), (max-width: 768px) {
+  .dashboard-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    align-items: center;
+  }
+
+  /* Brand stays top-left */
+  .brand-mark--small {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  /* Actions (profile button) stay top-right — always visible */
+  .dashboard-header__actions {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  /* Nav tabs move to second row, full width */
+  .dashboard-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 0.1rem;
+  }
+
+  .dashboard-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-link {
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .profile-menu-trigger {
+    flex-shrink: 0;
+  }
+
+  /* Keep dropdown on screen */
+  .profile-menu-dropdown {
+    right: 0;
+    left: auto;
+  }
+}
 html, body {
   overflow-x: hidden;
   max-width: 100vw;
